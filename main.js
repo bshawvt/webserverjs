@@ -331,6 +331,8 @@
 	/*  */
 	function HttpRequest(request, response) {
 		console.log("%s request from %s", request.method, request.connection.remoteAddress);
+		if (request.url.length == 0 || request.url.length == 1)
+			request.url = "/index.html";
 		var subdomain = request.headers.host.split(/[.]/g)[0] || "";
 		if (subdomain.toLowerCase() == "api")
 			return Api(request, response);
