@@ -301,6 +301,8 @@
 	var sslEnabled = false;
 	var port = 8888;
 	var sslPort = 444;
+	var keyPath = "";
+	var certPath = "";
 	var opts = {key: "", cert: ""};
 	if (process.argv.length > 1) {
 		for (var i = 1; i < process.argv.length; i++) {
@@ -316,10 +318,22 @@
 				case "-sport":{
 					if (i+1 < process.argv.length)
 						sslPort = parseInt(process.argv[i+1]);
+					//opts.key = FS.readFileSync(opts.key);
+					//opts.cert = FS.readFileSync(opts.cert);
 					break;
 				}
 				case "-ssl":{
 					sslEnabled = true;
+					break;
+				}
+				case "-key":{
+					if (i+1 < process.argv.length)
+						keyPath = process.argv[i+1];
+					break;
+				}
+				case "-cert":{
+					if (i+1 < process.argv.length)
+						certPath = process.argv[i+1];
 					break;
 				}
 				default: {
@@ -333,7 +347,9 @@
 		console.log("%s request from %s", request.method, request.connection.remoteAddress);
 		if (request.url.length == 0 || request.url.length == 1)
 			request.url = "/index.html";
-		var subdomain = request.headers.host.split(/[.]/g)[0] || "";
+		var subdomain = "";
+		if (request.headers.host)
+			subdomain = request.headers.host.split(/[.]/g)[0] || "";
 		if (subdomain.toLowerCase() == "api")
 			return Api(request, response);
 		switch(request.method.toUpperCase()) {
@@ -362,6 +378,8 @@
 	server.listen(port);
 	
 	if (sslEnabled) {
+		opts.key = FS.readFileSync(keyPath);
+		opts.cert = FS.readFileSync(certPath);
 		var sslServer = HTTPS.createServer(opts, HttpRequest);
 		sslServer.listen(sslPort);
 	}
