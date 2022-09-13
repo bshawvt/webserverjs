@@ -1,4 +1,5 @@
 (() => {
+	var HTTPS = require("https");
 	var HTTP = require("http");
 	var FS = require("fs");
 	var PATH = require("path");
@@ -103,7 +104,7 @@
 		}
 	}
 	function ApiError(request, response) {
-		
+		console.log("todo: ApiError");
 	}
 	function ApiReply(request, response, status, data) {
 		try {
@@ -211,66 +212,8 @@
 				if (controller.toLowerCase() == "user") {
 					new UserController(request, response, queryString);
 				}
-				//new ApiController(controller).doAction(action);
-				/*switch(action) {
-					case "read": {
-						if (queryString["filename"]) {
-							var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), queryString["filename"])));
-							console.log("the file is", filename);
-							OpenFile(filename, "utf8", function(file, data, status) {
-								if (status == 404) {
-									ApiReply(request, response, status, {error: "file not found"});
-								}
-								else if (status == 200) {
-									ApiReply(request, response, status, data.text);
-								}
-							});//file, encoding, fnDone, fnError);
-						}
-						break;
-					}
-					default: {
-						break;
-					}
-				}*/
 			}
-			/*
-				var result = JSON.stringify(message);
-				response.writeHead(status, {
-					"Content-Length": result.length,
-					"Content-Type": "application/json",
-					"Access-Control-Allow-Origin": request.headers["origin"],
-					"Access-Control-Allow-Methods": "*",
-					"Access-Control-Allow-Headers": "Accept, Content-Type, X-Requested-With"
-				});
-				response.write(result);
-				response.end();
-			}
-			catch (e) {
-				console.trace(e);
-			}*/
 		});
-		/*request.setEncoding("utf8");
-		
-		request.on("data", function(data) {
-			blob[blob.length] = data;
-		});
-		request.on("end", function(data) {
-			//blob = blob.join("");
-			console.log("amiere2", blob.toString(), blob.length);
-		});*/
-		
-		
-		
-		/*response.writeHead(status, {
-			"Content-Length": content.length,
-			"Content-Type": "application/json",
-			"Access-Control-Allow-Origin": request.headers["origin"],
-			"Access-Control-Allow-Methods": "*",
-			"Access-Control-Allow-Headers": "Accept, Content-Type, X-Requested-With"
-		});
-
-		response.write(content);
-		response.end();*/
 	};
 
 	/*  */
@@ -354,9 +297,39 @@
 		response.write(content);
 		response.end();
 	}
-
+	
+	var sslEnabled = false;
+	var port = 8888;
+	var sslPort = 444;
+	var opts = {key: "", cert: ""};
+	if (process.argv.length > 1) {
+		for (var i = 1; i < process.argv.length; i++) {
+			var arg = process.argv[i].toLowerCase();
+			switch(arg) {
+				case "-p":
+				case "-port":{
+					if (i+1 < process.argv.length)
+						port = parseInt(process.argv[i+1]);
+					break;
+				}
+				case "-sp":
+				case "-sport":{
+					if (i+1 < process.argv.length)
+						sslPort = parseInt(process.argv[i+1]);
+					break;
+				}
+				case "-ssl":{
+					sslEnabled = true;
+					break;
+				}
+				default: {
+					break;
+				}
+			};
+		}
+	}
 	/*  */
-	var server = HTTP.createServer(function(request, response) {
+	function HttpRequest(request, response) {
 		console.log("%s request from %s", request.method, request.connection.remoteAddress);
 		var subdomain = request.headers.host.split(/[.]/g)[0] || "";
 		if (subdomain.toLowerCase() == "api")
@@ -382,8 +355,13 @@
 				break;
 			}
 		}
-		
-	});
-	server.listen(8899);
+	}
+	var server = HTTP.createServer(HttpRequest);
+	server.listen(port);
+	
+	if (sslEnabled) {
+		var sslServer = HTTPS.createServer(opts, HttpRequest);
+		sslServer.listen(sslPort);
+	}
 
 })();
