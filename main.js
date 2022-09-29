@@ -376,12 +376,14 @@
 	}
 	var server = HTTP.createServer(HttpRequest);
 	server.listen(port);
-	
+	console.log("webserverjs: listening on port %i", port);
 	if (sslEnabled) {
 		opts.key = FS.readFileSync(keyPath);
 		opts.cert = FS.readFileSync(certPath);
 		var sslServer = HTTPS.createServer(opts, HttpRequest);
 		sslServer.listen(sslPort);
+		
+		console.log("webserverjs: listening on port %i (ssl)", sslPort);
 	}
 
 })();
