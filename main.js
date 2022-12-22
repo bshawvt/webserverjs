@@ -12,6 +12,28 @@
 	function GetContentType(str) {
 		var s = str.split(/[.]/g);
 		switch (s[s.length - 1]) {
+			case "wav": {
+				return "audio/wav";
+			}
+			case "ogg": {
+				return "audio/ogg";
+			}
+			case "mp3": {
+				return "audio/mp3";
+			}
+			case "ico": {
+				return "image/x-icon";
+			}
+			case "gif": {
+				return "image/gif";
+			}
+			case "png": {
+				return "image/png";
+			}
+			case "jpg":
+			case "jpeg": {
+				return "image/jpeg";
+			}
 			case "js": {
 				return "text/javascript";
 			}
@@ -24,13 +46,15 @@
 			case "wasm": {
 				return "application/wasm";
 			}
+			case "html":
+			case "htm": {
+				return "text/html";
+			}
 			case "bin": {
 				return "application/octet-stream";
 			}
-			case "html":
-			case "htm":
 			default: {
-				return "text/html"; //"text/plain";
+				return "text/plain";
 			}
 		}
 	};
@@ -62,7 +86,7 @@
 					FS.read(fd, {buffer: Buffer.alloc(fileSize)}, function(err, bytes, buffer) {
 						if(err !== null) return _fnDone(_file, "file not found", 404);//fnError(`- OpenFile request failed to read file -\n\t${_file}\n`);
 						var content = buffer.toString(encoding, 0, bytes);
-						_fnDone(PATH.resolve(_file), {text: content, raw: buffer}, 200);
+						_fnDone(PATH.resolve(_file), {text: buffer, raw: buffer}, 200);
 						FS.close(fd, function(err) {
 							if (err !== null) return;//console.log(`- OpenFile request failed to close file -\n\t${_file}\n`);
 						});
@@ -219,7 +243,7 @@
 	/*  */
 	function Put(request, response) {
 		//type = "text/html";
-		response.writeHead(status, {"Content-Length": Buffer.byteLength(content), "Content-Type": type});
+		response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
 		response.write(content);
 		response.end();
 	};
@@ -284,7 +308,7 @@
 			else if (status == 404) {
 				content = "<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
 			}
-			response.writeHead(status, {"Content-Length": Buffer.byteLength(content), "Content-Type": type});
+			response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
 			response.write(content);
 			response.end();
 		});
@@ -293,7 +317,7 @@
 	/*  */
 	function BadRequest(request, response, details) {
 		var content = `<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>${details}</div></body></html>`;
-		response.writeHead(500, {"Content-Length": Buffer.byteLength(content), "Content-Type": "text/html"});
+		response.writeHead(500, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": "text/html"});
 		response.write(content);
 		response.end();
 	}
