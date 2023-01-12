@@ -250,7 +250,6 @@
 
 	/*  */
 	function Post(request, response) {
-		
 		var chunk = [];
 		request.on("data", function(data) {
 			chunk[chunk.length] = data;
@@ -369,7 +368,7 @@
 	}
 	/*  */
 	function HttpRequest(request, response) {
-		console.log("%s request from %s", request.method, request.connection.remoteAddress);
+		console.log("%s HTTP/%s request from %s", request.method, request.httpVersion, request.connection.remoteAddress);
 		if (request.url.length == 0 || request.url.length == 1)
 			request.url = "/index.html";
 		var subdomain = "";
