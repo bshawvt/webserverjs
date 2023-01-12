@@ -283,6 +283,7 @@
 			response.writeHead(status, headers);
 			if (type != "application/x-www-form-urlencoded") // todo ? write stuff or redirect
 				response.write(chunk.toString());
+			console.log("POST request data: ", chunk);
 			response.end();
 		});
 	};
