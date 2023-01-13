@@ -7,7 +7,9 @@
 
 	var {Parse} = require("./parse.js");
 	
-	var states = [];
+	var WebServerStates = {
+		lastHttpRequestLogTime: new Date().getTime()
+	};
 
 	function GetContentType(str) {
 		var s = str.split(/[.]/g);
@@ -294,7 +296,7 @@
 		for(var str in url.query) // fix null prototype that URL.parse returns
 			queryStrings[str] = url.query[str];
 		var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-		console.log("serving: %s", filename);
+		//console.log("serving: %s", filename);
 		OpenFile(filename, 'utf8', function(filepath, contents, status) {
 			filepath = filepath || "";
 			//var splits = filepath.split(/[.]/g);
@@ -368,7 +370,20 @@
 	}
 	/*  */
 	function HttpRequest(request, response) {
-		console.log("%s HTTP/%s request from %s\n", request.method, request.httpVersion, request.connection.remoteAddress, request.headers);
+		var now = new Date();
+		var remoteAddress = request.headers["-x-forwarded-for"];
+		var fromAddress = request.connection.remoteAddress;
+		var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
+		var url = URL.parse(request.url, true);
+		var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
+		console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
+					now,
+					request.method, 
+					request.httpVersion,
+					fromString,
+					filename,
+					request.headers);
+
 		if (request.url.length == 0 || request.url.length == 1)
 			request.url = "/index.html";
 		var subdomain = "";
