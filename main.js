@@ -368,7 +368,7 @@
 	}
 	/*  */
 	function HttpRequest(request, response) {
-		console.log("%s HTTP/%s request from %s", request.method, request.httpVersion, request.connection.remoteAddress);
+		console.log("%s HTTP/%s request from %s\n", request.method, request.httpVersion, request.connection.remoteAddress, request.headers);
 		if (request.url.length == 0 || request.url.length == 1)
 			request.url = "/index.html";
 		var subdomain = "";
