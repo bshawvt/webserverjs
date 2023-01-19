@@ -5,12 +5,28 @@
 	var PATH = require("path");
 	var URL = require("url");
 
-	var {Parse} = require("./parse.js");
+	//var {Parse} = require("parse.js");
+	//var {Controller} = require("controller.js");
 	
 	var WebServerStates = {
 		lastHttpRequestLogTime: new Date().getTime()
 	};
 
+ 	function Error(code, message) {
+		var extra = message ? ["<span>", message, "</span>"].join("") : "";
+		var error = "<h1>Error 500</h1><p>Internal Server Error</p>";
+		switch(code) {
+			case 404: {
+				error = "<h1>Error 404</h1><p>File Not Found</p>";
+				break;
+			}
+			case 500:
+			default: {
+				break;
+			}
+		}
+		return `<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`;
+	}
 	function GetContentType(str) {
 		var s = str.split(/[.]/g);
 		switch (s[s.length - 1]) {
@@ -98,149 +114,7 @@
 		})(file, encoding, fnDone, fnError);
 	};
 
-	function GetQuery(request, fnDone) {
-		var queryString = [];		
-		request.setEncoding('utf8');
-		fnDone = fnDone || (() => {});
-		switch (request.method.toUpperCase()) {
-			case 'DELETE':
-			case 'POST':
-			case 'PUT': {
-				var blob = [];
-				request.on("data", function(data) {
-					blob[blob.length] = data;
-				});
-				request.on("end", function(data) {
-					var url = URL.parse(blob.toString(), true);//.query
-					for(var str in url.query) // fix null prototype that URL.parse returns
-						queryString[str] = url.query[str];
-					return fnDone(queryString);
-				});
-				break;
-			}
-			case 'GET':
-			case 'HEAD':
-			default: {
-				var url = URL.parse(request.url, true);//.query
-				console.log("omg! ", url);
-				for(var str in url.query) // fix null prototype that URL.parse returns
-					queryString[str] = url.query[str];
-				return fnDone(queryString);
-			}
-		}
-	}
-	function ApiError(request, response) {
-		console.log("todo: ApiError");
-	}
-	function ApiReply(request, response, status, data) {
-		try {
-			var result = data;
-			if (typeof data != 'string')
-				result = JSON.stringify(data);
-			response.writeHead(status, {
-				"Content-Length": result.length,
-				"Content-Type": "application/json",
-				"Access-Control-Allow-Origin": request.headers["origin"],
-				"Access-Control-Allow-Methods": "*",
-				"Access-Control-Allow-Headers": "Accept, Content-Type, X-Requested-With"
-			});
-			response.write(result);
-			response.end();
-		}
-		catch(e) {
-			console.trace(e);
-		}
-	}
-	function UserController(request, response, queryString) {
-		if (queryString["action"]) {
-			var action = queryString["action"].toLowerCase();
-			switch(action) {
-				case 'get': {
-					if (!(queryString["filename"]))
-						return ApiReply(request, response, 400, {error: "bad request"});
-
-					var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), queryString["filename"])));
-					OpenFile(filename, "utf8", function(file, data, status) {
-						if (status == 404) {
-							ApiReply(request, response, status, {error: "file not found"});
-						}
-						else if (status == 200) {
-							ApiReply(request, response, status, data.text);
-						}
-					});
-					break;
-				}
-				
-				case 'add': {
-					
-					if (!(queryString["filename"] && queryString["url"]))
-						return ApiReply(request, response, 400, {error: "bad request"});
-					
-					var fUrl = queryString["url"];
-					var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), queryString["filename"])));
-					
-					OpenFile(filename, "utf8", function(file, data, status) {
-						if (status == 404) {
-							ApiReply(request, response, status, {error: "file not found"});
-						}
-						else if (status == 200) {
-							try {
-								var json = JSON.parse(data.text);
-								var d = new Date();
-								json.contents.push({id: json.contents.length, clicks: 0, url: fUrl, date: `${d.getDate()}/${d.getMonth()}/${d.getFullYear()}`});
-								//SaveFile(file, encoding, data, fnDone) {
-								SaveFile(filename, "utf8", JSON.stringify(json), function(fn, success, error) {
-									if (!success)
-										console.log("something bad happened");
-								});
-							}
-							catch(e) {
-								console.trace(e);
-							}
-							//ApiReply(request, response, status, data.text);
-						}
-					});
-					break;
-				}
-				case 'update': {
-					break;
-				}
-				case 'delete': {
-					var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), queryString["filename"])));
-					OpenFile(filename, "utf8", function(file, data, status) {
-						if (status == 404) {
-							ApiReply(request, response, status, {error: "file not found"});
-						}
-						else if (status == 200) {
-							//ApiReply(request, response, status, data.text);
-						}
-					});
-					break;
-				}
-				default: {
-					break;
-				}
-				break;
-			}
-		}
-	};
 	
-	/*  */
-	function Api(request, response) {
-		console.log("api request..");
-		GetQuery(request, function(queryString) {
-			console.log("api queryString: ", queryString);
-			/*try {*/
-			var message = {};
-			var controller = queryString["controller"];
-			var action = queryString["action"];
-			if (controller && action) {
-				if (controller.toLowerCase() == "user") {
-					new UserController(request, response, queryString);
-				}
-			}
-		});
-	};
 
 	/*  */
 	function Put(request, response) {
@@ -254,11 +128,14 @@
 	function Post(request, response) {
 		var chunk = [];
 		request.on("data", function(data) {
+			/*if (request.headers["content-type"] == "application/x-www-form-urlencoded")
+				return;*/
 			chunk[chunk.length] = data;
 		});
 
 		request.on("end", function() {
 			chunk = chunk.join('');
+			var pchunk = chunk;
 			var type = request.headers["content-type"];
 			var headers = {"Content-Type": "text/html"};
 			var status = 200;
@@ -277,14 +154,15 @@
 				default: {
 					//console.log("i am here");
 					status = 500;
-					chunk = "<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
+					pchunk = chunk;
+					chunk = Error(500, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
 					break; 
 				}
 			};
 			response.writeHead(status, headers);
 			if (type != "application/x-www-form-urlencoded") // todo ? write stuff or redirect
 				response.write(chunk.toString());
-			console.log("POST request data: ", chunk);
+			console.log("POST request data: ", pchunk);
 			response.end();
 		});
 	};
@@ -301,14 +179,14 @@
 			filepath = filepath || "";
 			//var splits = filepath.split(/[.]/g);
 			var type = "text/html";
-			var content = "<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p></body></html>";
+			var content = Error(500);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p></body></html>";
 			if (status == 200) {// && splits.length > 1) {
 				content = contents.text;
 				//var vl = splits[splits.length - 1].toLowerCase();
 				type = GetContentType(filename);
 			}
 			else if (status == 404) {
-				content = "<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
+				content = Error(404);//"<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
 			}
 			response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
 			response.write(content);
@@ -318,7 +196,7 @@
 
 	/*  */
 	function BadRequest(request, response, details) {
-		var content = `<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>${details}</div></body></html>`;
+		var content = Error(500, details);//`<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>${details}</div></body></html>`;
 		response.writeHead(500, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": "text/html"});
 		response.write(content);
 		response.end();
@@ -389,8 +267,8 @@
 		var subdomain = "";
 		if (request.headers.host)
 			subdomain = request.headers.host.split(/[.]/g)[0] || "";
-		if (subdomain.toLowerCase() == "api")
-			return Api(request, response);
+		/*if (subdomain.toLowerCase() == "api")
+			return Api(request, response);*/
 		switch(request.method.toUpperCase()) {
 			case 'POST': {
 				Post(request, response);
@@ -408,7 +286,7 @@
 			case 'CONNECT':
 			case 'TRACE':
 			default: {
-				BadRequest(request, response, `${request.method} requests are currently unhandled.`);
+				BadRequest(request, response, `Illegal ${request.method} requests has been logged.`);
 				break;
 			}
 		}
