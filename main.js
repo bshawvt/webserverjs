@@ -12,6 +12,8 @@
 		lastHttpRequestLogTime: new Date().getTime()
 	};
 
+	var hostname = null;
+
  	function Error(code, message) {
 		var extra = message ? ["<span>", message, "</span>"].join("") : "";
 		var error = "<h1>Error 500</h1><p>Internal Server Error</p>";
@@ -240,6 +242,11 @@
 						certPath = process.argv[i+1];
 					break;
 				}
+				case "-hostname": {
+					if (i+1 < process.argv.length)
+						hostname = process.argv[i+1];
+					break;
+				}
 				default: {
 					break;
 				}
@@ -249,11 +256,21 @@
 	/*  */
 	function HttpRequest(request, response) {
 		var now = new Date();
-		var remoteAddress = request.headers["-x-forwarded-for"];
+		var host = request.headers["host"];
+		var remoteAddress = request.headers["x-forwarded-for"];
 		var fromAddress = request.connection.remoteAddress;
 		var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
 		var url = URL.parse(request.url, true);
 		var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
+		if (hostname != null && host.toLowerCase() != hostname.toLowerCase()) {
+			console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
+					now,
+					request.method, 
+					request.httpVersion,
+					fromString);
+			response.destroy();
+			return response.socket.end();
+		}
 		console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
 					now,
 					request.method, 
@@ -261,13 +278,12 @@
 					fromString,
 					filename,
 					request.headers);
-
 		if (request.url.length == 0 || request.url.length == 1)
 			request.url = "/index.html";
-		var subdomain = "";
+		/*var subdomain = "";
 		if (request.headers.host)
 			subdomain = request.headers.host.split(/[.]/g)[0] || "";
-		/*if (subdomain.toLowerCase() == "api")
+		if (subdomain.toLowerCase() == "api")
 			return Api(request, response);*/
 		switch(request.method.toUpperCase()) {
 			case 'POST': {
