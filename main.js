@@ -130,8 +130,8 @@
 	function Post(request, response) {
 		var chunk = [];
 		request.on("data", function(data) {
-			/*if (request.headers["content-type"] == "application/x-www-form-urlencoded")
-				return;*/
+			if (request.headers["content-type"] == "application/x-www-form-urlencoded")
+				return;
 			chunk[chunk.length] = data;
 		});
 
