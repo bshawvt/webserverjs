@@ -184,7 +184,6 @@
 			if (url.pathname == "/")
 				url.pathname = "/index.html";
 			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-			console.log("filename", filename, request.url);
 			OpenFile(filename, 'utf8', function(filepath, contents, status) {
 				filepath = filepath || "";
 				//var splits = filepath.split(/[.]/g);
@@ -296,12 +295,12 @@
 			var url = URL.parse(request.url, true);
 			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
 			if (hostname != null && host.toLowerCase() != hostname.toLowerCase()) {
-				/*console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
+				console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
 						now,
 						request.method, 
 						request.httpVersion,
 						fromString);
-				response.destroy();*/
+				response.destroy();
 				return response.socket.end();
 			}
 			console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
@@ -348,7 +347,7 @@
 			}
 		}
 		catch(e) {
-			console.log("err: ", e);
+			console.log("fatal error in HttpRequest(): ", e);
 		}
 	}
 	var server = HTTP.createServer(HttpRequest);
