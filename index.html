@@ -27,6 +27,28 @@
 			}
 		</style>
 		<script type="application/javascript">
+			function getRequest() {
+				var req = new XMLHttpRequest();
+				req.open("GET", "/", true);
+				req.responseType = "json";
+				req.onreadystatechange = function() {
+					if (req.readyState == 4 && req.status == 200) {
+						console.log(req.response);
+					};
+				};
+				req.send(null);
+			}
+			function postRequest() {
+				var req = new XMLHttpRequest();
+				req.open("POST", "/", true);
+				req.responseType = "json";
+				req.onreadystatechange = function() {
+					if (req.readyState == 4 && req.status == 200) {
+						console.log(req.response);
+					};
+				};
+				req.send("myvar=my+data");
+			}
 			function putRequest() {
 				var req = new XMLHttpRequest();
 				req.open("PUT", "/", true);
@@ -36,8 +58,20 @@
 						console.log(req.response);
 					};
 				};
-				req.send();
+				req.send("myput=my+data");
 			}
+			function headRequest() {
+				var req = new XMLHttpRequest();
+				req.open("HEAD", "/test", true);
+				req.responseType = "json";
+				req.onreadystatechange = function() {
+					if (req.readyState == 4 && req.status == 200) {
+						console.log(req.response);
+					};
+				};
+				req.send(null);
+			}
+			
 		</script>
 	</head>
 	<body class="no-padding no-margin full-width full-height">
@@ -98,17 +132,42 @@
 					<tr>
 						<td>
 							<label for="test4">
-								<span>PUT test:</span>
+								<span>XMLRequest get test:</span>
+							</label>
+							<input type="submit" onclick="getRequest()"/>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<label for="test5">
+								<span>XMLRequest post test:</span>
+							</label>
+							<input type="submit" onclick="postRequest()"/>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<label for="test6">
+								<span>XMLRequest put test:</span>
 							</label>
 							<input type="submit" onclick="putRequest()"/>
 						</td>
 					</tr>
+					<tr>
+						<td>
+							<label for="test7">
+								<span>XMLRequest head test:</span>
+							</label>
+							<input type="submit" onclick="headRequest()"/>
+						</td>
+					</tr>
+					
 				</tbody>
 				<tfoot>
 					<tr>
-						<!--<td>
-							Something goes here
-						</td>-->
+						<td>
+							<img src="example1.png"/>
+						</td>
 					</tr>
 				</tfoot>
 			</table>

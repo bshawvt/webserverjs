@@ -68,7 +68,7 @@
 			}
 			case "html":
 			case "htm": {
-				return "text/html";
+				return "text/html; charset=UTF-8";
 			}
 			case "bin": {
 				return "application/octet-stream";
@@ -116,93 +116,124 @@
 		})(file, encoding, fnDone, fnError);
 	};
 
-	
+
 
 	/*  */
-	function Put(request, response) {
+	/*function Put(request, response) {
 		//type = "text/html";
 		response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
 		response.write(content);
 		response.end();
-	};
+	};*/
 
 	/*  */
 	function Post(request, response) {
-		var chunk = [];
-		request.on("data", function(data) {
-			if (request.headers["content-type"] == "application/x-www-form-urlencoded")
-				return;
-			chunk[chunk.length] = data;
-		});
+		try {
+			var chunk = [];
+			request.on("data", function(data) {
+				if (request.headers["content-type"] == "application/x-www-form-urlencoded")
+					return;
+				chunk[chunk.length] = data;
+			});
 
-		request.on("end", function() {
-			chunk = chunk.join('');
-			var pchunk = chunk;
-			var type = request.headers["content-type"];
-			var headers = {"Content-Type": "text/html"};
-			var status = 200;
-			switch(type) {
-				case "text/plain": { // debug
-					status = 200;
-					headers["Content-Length"] = chunk.length;
-					break; 
-				}
-				case "application/x-www-form-urlencoded": {// default form
-					status = 303;
-					headers["Location"] = request.url;
-					break;
-				}
-				case "multipart/form-data": // form input type=file for file upload
-				default: {
-					//console.log("i am here");
-					status = 500;
-					pchunk = chunk;
-					chunk = Error(500, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
-					break; 
-				}
-			};
-			response.writeHead(status, headers);
-			if (type != "application/x-www-form-urlencoded") // todo ? write stuff or redirect
-				response.write(chunk.toString());
-			console.log("POST request data: ", pchunk);
-			response.end();
-		});
+			request.on("end", function() {
+				chunk = chunk.join('');
+				var pchunk = chunk;
+				var type = request.headers["content-type"];
+				var headers = {"Content-Type": "text/html; charset=UTF-8"};
+				var status = 200;
+				switch(type) {
+					case "text/plain": { // debug
+						status = 200;
+						headers["Content-Length"] = chunk.length;
+						break; 
+					}
+					case "application/x-www-form-urlencoded": {// default form
+						status = 303;
+						headers["Location"] = request.url;
+						break;
+					}
+					case "multipart/form-data": // form input type=file for file upload
+					default: {
+						//console.log("i am here");
+						status = 500;
+						pchunk = chunk;
+						chunk = Error(500, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
+						break; 
+					}
+				};
+				response.writeHead(status, headers);
+				if (type != "application/x-www-form-urlencoded") // todo ? write stuff or redirect
+					response.write(chunk.toString());
+				console.log("POST request data: ", pchunk);
+				response.end();
+			});
+		}
+		catch(e) {
+			console.log("fatal error in Post(): ", e);
+		};
 	};
 
 	/*  */
 	function Get(request, response) {
-		var queryStrings = [];
-		var url = URL.parse(request.url, true);//.query
-		for(var str in url.query) // fix null prototype that URL.parse returns
-			queryStrings[str] = url.query[str];
-		var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-		//console.log("serving: %s", filename);
-		OpenFile(filename, 'utf8', function(filepath, contents, status) {
-			filepath = filepath || "";
-			//var splits = filepath.split(/[.]/g);
-			var type = "text/html";
-			var content = Error(500);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p></body></html>";
-			if (status == 200) {// && splits.length > 1) {
-				content = contents.text;
-				//var vl = splits[splits.length - 1].toLowerCase();
-				type = GetContentType(filename);
-			}
-			else if (status == 404) {
-				content = Error(404);//"<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
-			}
-			response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
-			response.write(content);
-			response.end();
-		});
-	}
+		try {
+			var queryStrings = [];
+			var url = URL.parse(request.url, true);//.query
+			/*for(var str in url.query) // fix null prototype that URL.parse returns
+				queryStrings[str] = url.query[str];*/
+			if (url.pathname == "/")
+				url.pathname = "/index.html";
+			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
+			console.log("filename", filename, request.url);
+			OpenFile(filename, 'utf8', function(filepath, contents, status) {
+				filepath = filepath || "";
+				//var splits = filepath.split(/[.]/g);
+				var type = "text/html; charset=UTF-8";
+				var content = Error(500);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p></body></html>";
+				if (status == 200) {// && splits.length > 1) {
+					content = contents.text;
+					//var vl = splits[splits.length - 1].toLowerCase();
+					type = GetContentType(filename);
+				}
+				else if (status == 404) {
+					content = Error(404);//"<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
+				}
+
+				response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
+				response.write(content);
+				response.end();
+			});
+		}
+		catch(e) {
+			console.log("fatal error in Get(): ", e);
+		}
+	};
+	function Head(request, response) {
+		try {
+			var url = URL.parse(request.url, true);//.query
+			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
+			var headers = {"Content-Type": "text/html; charset=UTF-8"};
+			OpenFile(filename, 'utf8', function(filepath, contents, status) {
+				if (status == 200) {
+					headers["Content-Length"] = Buffer.byteLength(contents.text) - 1;
+					headers["Content-Type"] = GetContentType(filename);
+				}
+				response.writeHead(status, headers);//{"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
+				response.end();
+			});
+		}
+		catch(e) {
+			console.log("fatal error in Head(): ", e);
+		}
+	};
 
 	/*  */
 	function BadRequest(request, response, details) {
 		var content = Error(500, details);//`<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>${details}</div></body></html>`;
-		response.writeHead(500, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": "text/html"});
+		response.writeHead(500, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": "text/html; charset=UTF-8"});
 		response.write(content);
 		response.end();
-	}
+	};
 	
 	var sslEnabled = false;
 	var port = 8888;
@@ -255,56 +286,69 @@
 	}
 	/*  */
 	function HttpRequest(request, response) {
-		var now = new Date();
-		var host = request.headers["host"];
-		var remoteAddress = request.headers["x-forwarded-for"];
-		var fromAddress = request.connection.remoteAddress;
-		var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
-		var url = URL.parse(request.url, true);
-		var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-		if (hostname != null && host.toLowerCase() != hostname.toLowerCase()) {
-			console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
-					now,
-					request.method, 
-					request.httpVersion,
-					fromString);
-			response.destroy();
-			return response.socket.end();
+		try {
+			//iamerror();
+			var now = new Date();
+			var host = request.headers["host"];
+			var remoteAddress = request.headers["x-forwarded-for"];
+			var fromAddress = request.connection.remoteAddress;
+			var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
+			var url = URL.parse(request.url, true);
+			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
+			if (hostname != null && host.toLowerCase() != hostname.toLowerCase()) {
+				/*console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
+						now,
+						request.method, 
+						request.httpVersion,
+						fromString);
+				response.destroy();*/
+				return response.socket.end();
+			}
+			console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
+						now,
+						request.method, 
+						request.httpVersion,
+						fromString,
+						filename,
+						request.headers);
+			/*if (request.url.length == 0 || request.url[request.url.length - 1] == "/")
+				request.url = [request.url, "index.html"].join("");
+
+			console.log("filename is now", request.url);*/
+			//if (request.url.length == 0 || request.url.length == 1)
+			//	request.url = "/index.html";
+			/*var subdomain = "";
+			if (request.headers.host)
+				subdomain = request.headers.host.split(/[.]/g)[0] || "";
+			if (subdomain.toLowerCase() == "api")
+				return Api(request, response);*/
+			switch(request.method.toUpperCase()) {
+				case 'POST': {
+					Post(request, response);
+					break;
+				}
+				case 'GET': {
+					Get(request, response);
+					break;
+				}
+				case 'HEAD': {
+					Head(request, response);
+					break;
+				}
+				case 'PUT':
+				case 'DELETE':
+				case 'PATCH':
+				case 'OPTIONS':
+				case 'CONNECT':
+				case 'TRACE':
+				default: {
+					BadRequest(request, response, `Illegal ${request.method} requests has been logged.`);
+					break;
+				}
+			}
 		}
-		console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
-					now,
-					request.method, 
-					request.httpVersion,
-					fromString,
-					filename,
-					request.headers);
-		if (request.url.length == 0 || request.url.length == 1)
-			request.url = "/index.html";
-		/*var subdomain = "";
-		if (request.headers.host)
-			subdomain = request.headers.host.split(/[.]/g)[0] || "";
-		if (subdomain.toLowerCase() == "api")
-			return Api(request, response);*/
-		switch(request.method.toUpperCase()) {
-			case 'POST': {
-				Post(request, response);
-				break;
-			}
-			case 'GET': {
-				Get(request, response);
-				break;
-			}
-			case 'PUT':
-			case 'HEAD':
-			case 'DELETE':
-			case 'PATCH':
-			case 'OPTIONS':
-			case 'CONNECT':
-			case 'TRACE':
-			default: {
-				BadRequest(request, response, `Illegal ${request.method} requests has been logged.`);
-				break;
-			}
+		catch(e) {
+			console.log("err: ", e);
 		}
 	}
 	var server = HTTP.createServer(HttpRequest);
