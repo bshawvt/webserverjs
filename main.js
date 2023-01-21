@@ -131,7 +131,7 @@
 		try {
 			var chunk = [];
 			request.on("data", function(data) {
-				if (request.headers["content-type"] == "application/x-www-form-urlencoded")
+				if (request.headers["content-type"] == "multipart/form-data")
 					return;
 				chunk[chunk.length] = data;
 			});
@@ -139,7 +139,9 @@
 			request.on("end", function() {
 				chunk = chunk.join('');
 				var pchunk = chunk;
-				var type = request.headers["content-type"];
+				var type = "";
+				if (request.headers["content-type"])
+					type = request.headers["content-type"].split(";")[0];
 				var headers = {"Content-Type": "text/html; charset=UTF-8"};
 				var status = 200;
 				switch(type) {
@@ -183,6 +185,8 @@
 				queryStrings[str] = url.query[str];*/
 			if (url.pathname == "/")
 				url.pathname = "/index.html";
+			else if (url.pathname[url.pathname.length - 1] == "/")
+				url.pathname = [url.pathname, "/index.html"].join("");
 			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
 			OpenFile(filename, 'utf8', function(filepath, contents, status) {
 				filepath = filepath || "";
@@ -303,24 +307,14 @@
 				response.destroy();
 				return response.socket.end();
 			}
-			console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\n%o\n", 
+			console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\nrequested url: %s\n%o\n", 
 						now,
 						request.method, 
 						request.httpVersion,
 						fromString,
 						filename,
+						request.url,
 						request.headers);
-			/*if (request.url.length == 0 || request.url[request.url.length - 1] == "/")
-				request.url = [request.url, "index.html"].join("");
-
-			console.log("filename is now", request.url);*/
-			//if (request.url.length == 0 || request.url.length == 1)
-			//	request.url = "/index.html";
-			/*var subdomain = "";
-			if (request.headers.host)
-				subdomain = request.headers.host.split(/[.]/g)[0] || "";
-			if (subdomain.toLowerCase() == "api")
-				return Api(request, response);*/
 			switch(request.method.toUpperCase()) {
 				case 'POST': {
 					Post(request, response);
@@ -356,7 +350,7 @@
 	if (sslEnabled) {
 		opts.key = FS.readFileSync(keyPath);
 		opts.cert = FS.readFileSync(certPath);
-		var sslServer = HTTPS.createServer(opts, HttpRequest);
+		var sslServer = HTTPS.createServer(opts, HttpRequest);cb
 		sslServer.listen(sslPort);
 		
 		console.log("webserverjs: listening on port %i (ssl)", sslPort);
