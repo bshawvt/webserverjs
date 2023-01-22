@@ -8,11 +8,7 @@
 	//var {Parse} = require("parse.js");
 	//var {Controller} = require("controller.js");
 	
-	var WebServerStates = {
-		lastHttpRequestLogTime: new Date().getTime()
-	};
-
-	var hostname = null;
+	
 
  	function Error(code, message) {
 		var extra = message ? ["<span>", message, "</span>"].join("") : "";
@@ -238,59 +234,9 @@
 		response.end();
 	};
 	
-	var sslEnabled = false;
-	var port = 8888;
-	var sslPort = 444;
-	var keyPath = "";
-	var certPath = "";
-	var opts = {key: "", cert: ""};
-	if (process.argv.length > 1) {
-		for (var i = 1; i < process.argv.length; i++) {
-			var arg = process.argv[i].toLowerCase();
-			switch(arg) {
-				case "-p":
-				case "-port":{
-					if (i+1 < process.argv.length)
-						port = parseInt(process.argv[i+1]);
-					break;
-				}
-				case "-sp":
-				case "-sport":{
-					if (i+1 < process.argv.length)
-						sslPort = parseInt(process.argv[i+1]);
-					//opts.key = FS.readFileSync(opts.key);
-					//opts.cert = FS.readFileSync(opts.cert);
-					break;
-				}
-				case "-ssl":{
-					sslEnabled = true;
-					break;
-				}
-				case "-key":{
-					if (i+1 < process.argv.length)
-						keyPath = process.argv[i+1];
-					break;
-				}
-				case "-cert":{
-					if (i+1 < process.argv.length)
-						certPath = process.argv[i+1];
-					break;
-				}
-				case "-hostname": {
-					if (i+1 < process.argv.length)
-						hostname = process.argv[i+1];
-					break;
-				}
-				default: {
-					break;
-				}
-			};
-		}
-	}
 	/*  */
 	function HttpRequest(request, response) {
 		try {
-			//iamerror();
 			var now = new Date();
 			var host = request.headers["host"];
 			var remoteAddress = request.headers["x-forwarded-for"];
@@ -298,7 +244,7 @@
 			var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
 			var url = URL.parse(request.url, true);
 			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-			if (hostname != null && host.toLowerCase() != hostname.toLowerCase()) {
+			if (hostname != null && (host == undefined || host.toLowerCase() != hostname.toLowerCase()))  {
 				console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
 						now,
 						request.method, 
@@ -344,15 +290,71 @@
 			console.log("fatal error in HttpRequest(): ", e);
 		}
 	}
-	var server = HTTP.createServer(HttpRequest);
+	var WebServerStates = {
+		lastHttpRequestLogTime: new Date().getTime()
+	};
+
+	var hostname = null;
+	var sslEnabled = false;
+	var port = 8888;
+	var sslPort = 444;
+	var keyPath = "";
+	var certPath = "";
+	var opts = { timeout: 10000,requestTimeout: 1000, headersTimeout: 1000, key: "", cert: ""};
+	if (process.argv.length > 1) {
+		for (var i = 1; i < process.argv.length; i++) {
+			var arg = process.argv[i].toLowerCase();
+			switch(arg) {
+				case "-p":
+				case "-port":{
+					if (i+1 < process.argv.length)
+						port = parseInt(process.argv[i+1]);
+					break;
+				}
+				case "-sp":
+				case "-sport":{
+					if (i+1 < process.argv.length)
+						sslPort = parseInt(process.argv[i+1]);
+					//opts.key = FS.readFileSync(opts.key);
+					//opts.cert = FS.readFileSync(opts.cert);
+					break;
+				}
+				case "-ssl":{
+					sslEnabled = true;
+					break;
+				}
+				case "-key":{
+					if (i+1 < process.argv.length)
+						keyPath = process.argv[i+1];
+					break;
+				}
+				case "-cert":{
+					if (i+1 < process.argv.length)
+						certPath = process.argv[i+1];
+					break;
+				}
+				case "-hostname": {
+					if (i+1 < process.argv.length)
+						hostname = process.argv[i+1];
+					console.log("hostname is now %s", hostname);
+					break;
+				}
+				default: {
+					break;
+				}
+			};
+		}
+	}
+	var server = HTTP.createServer(opts, HttpRequest);
 	server.listen(port);
+	server.setTimeout(opts.timeout);
 	console.log("webserverjs: listening on port %i", port);
 	if (sslEnabled) {
 		opts.key = FS.readFileSync(keyPath);
 		opts.cert = FS.readFileSync(certPath);
 		var sslServer = HTTPS.createServer(opts, HttpRequest);cb
 		sslServer.listen(sslPort);
-		
+		sslServer.setTimeout(opts.timeout);
 		console.log("webserverjs: listening on port %i (ssl)", sslPort);
 	}
 

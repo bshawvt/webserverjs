@@ -38,6 +38,17 @@
 				};
 				req.send(null);
 			}
+			function getUnsafeRequest() {
+				var req = new XMLHttpRequest();
+				req.open("GET", "/../neofetch", true);
+				req.responseType = "json";
+				req.onreadystatechange = function() {
+					if (req.readyState == 4 && req.status == 200) {
+						console.log(req.response);
+					};
+				};
+				req.send(null);
+			}
 			function postRequest() {
 				var req = new XMLHttpRequest();
 				req.open("POST", "/", true);
@@ -159,6 +170,14 @@
 								<span>XMLRequest head test:</span>
 							</label>
 							<input type="submit" onclick="headRequest()"/>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<label for="test8">
+								<span>Directory traversal request:</span>
+							</label>
+							<input type="submit" onclick="getUnsafeRequest()"/>
 						</td>
 					</tr>
 					
