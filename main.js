@@ -9,7 +9,19 @@
 	//var {Controller} = require("controller.js");
 	//var resolve = path.resolve(path.normalize(path.join(wwwroot, path)));
 	function inRoot(path) {
-		if (path.indexOf(wwwroot) == 0) {
+		if (path.indexOf(wwwroot) == 0) { // this should be sufficient in testing for traversal attempts
+			// but for my mental health there will be multiple tests
+			var pathSplits = path.split(/[\/]/g);
+			var rootSplits = wwwroot.split(/[\/]/g);
+			if (pathSplits.length >= rootSplits.length) {
+				for(var i = 0; i < rootSplits.length; i++) {
+					if (pathSplits[i] != rootSplits[i])
+						return false;
+				};
+			}
+			else {
+				return false;
+			}
 			return true;
 		}
 		return false;
@@ -34,7 +46,7 @@
 			default: {
 				break;
 			}
-		}
+		};
 		return Buffer.from(`<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`);
 	};
 	function GetContentType(str) {
@@ -84,7 +96,7 @@
 			default: {
 				return "text/plain";
 			}
-		}
+		};
 	};
 	// fnDone(filename, error, errorMessage)
 	function SaveFile(file, encoding, data, fnDone) {
@@ -104,8 +116,7 @@
 		((_file, _encoding, _fnDone, _fnError) => {
 			_fnDone = _fnDone || (() => {});
 			_fnError = _fnError || (() => {});
-			var encoding = _encoding || 'utf8'; 
-			//var web = electron.BrowserWindow.fromId(_uuid);
+			var encoding = _encoding || 'utf8';
 			FS.open(_file, 'r', function(err, fd) {
 				if(err !== null) return _fnDone(_file, "file not found", 404);//console.log(`- OpenFile request failed to open file -\n\t${_file}\n`);
 				FS.fstat(fd, function(err, stats) {
@@ -113,7 +124,6 @@
 					var fileSize = stats.size + 1;
 					FS.read(fd, {buffer: Buffer.alloc(fileSize)}, function(err, bytes, buffer) {
 						if(err !== null) return _fnDone(_file, "file not found", 404);//fnError(`- OpenFile request failed to read file -\n\t${_file}\n`);
-						//var content = buffer.toString(encoding, 0, bytes);
 						_fnDone(PATH.resolve(_file), buffer, 200);
 						FS.close(fd, function(err) {
 							if (err !== null) return;//console.log(`- OpenFile request failed to close file -\n\t${_file}\n`);
@@ -124,16 +134,6 @@
 		})(file, encoding, fnDone, fnError);
 	};
 
-
-
-	/*  */
-	/*function Put(request, response) {
-		//type = "text/html";
-		response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
-		response.write(content);
-		response.end();
-	};*/
-	
 	function HttpCancelSocket(response) {
 		try {
 			response.destroy();
@@ -162,9 +162,6 @@
 			request.on("end", function() {
 				chunk = chunk.join('');
 				var pchunk = chunk;
-				//var type = "";
-				//if (request.headers["content-type"])
-				//	type = request.headers["content-type"].split(";")[0];
 				var headers = {"Content-Type": GetContentType(".html")};
 				var status = 200;
 				switch(type) {
@@ -179,17 +176,9 @@
 						break;
 					}
 					case "multipart/form-data": {// form input type=file for file upload
-						/*status = 500;
-						pchunk = chunk;
-						chunk = Error(status, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
-						headers["Content-Length"] = chunk.length;*/
 						return BadRequest(request, response, 500, "Illegal file upload has been logged");
 					}
 					default: {
-						//status = 400;
-						//pchunk = chunk;
-						//chunk = Error(status);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
-						//headers["Content-Length"] = chunk.length;
 						return BadRequest(request, response, 400);
 					}
 				};
@@ -218,7 +207,7 @@
 					response.end();
 					console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
 					return;
-				}
+				};
 				return BadRequest(request, response, 404);
 			});
 		}
@@ -234,10 +223,11 @@
 				if (status == 200) {
 					headers["Content-Length"] = Buffer.byteLength(contents) - 1;
 					headers["Content-Type"] = GetContentType(filepath);
-				}
+				};
 				console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
 				response.writeHead(status, headers);
 				response.end();
+				return;
 			});
 		}
 		catch(e) {
@@ -288,6 +278,7 @@
 			};
 			httpResponse.location = PATH.resolve(PATH.normalize(PATH.join(wwwroot, httpResponse.url.pathname)));
 			if (!inRoot(httpResponse.location)) {
+				console.log("Request rejected for resource: %s", httpResponse.location);
 				return BadRequest(request, response, 403, "Directory Traversal attempt has been logged.");
 			};
 			for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
