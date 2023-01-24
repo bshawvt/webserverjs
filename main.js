@@ -7,13 +7,25 @@
 
 	//var {Parse} = require("parse.js");
 	//var {Controller} = require("controller.js");
-	
-	
-
+	//var resolve = path.resolve(path.normalize(path.join(wwwroot, path)));
+	function inRoot(path) {
+		if (path.indexOf(wwwroot) == 0) {
+			return true;
+		}
+		return false;
+	};
  	function Error(code, message) {
 		var extra = message ? ["<span>", message, "</span>"].join("") : "";
 		var error = "<h1>Error 500</h1><p>Internal Server Error</p>";
 		switch(code) {
+			case 400: {
+				error = "<h1>Error 400</h1><p>Bad Request</p>";
+				break;
+			}
+			case 403: {
+				error = "<h1>Error 403</h1><p>Forbidden</p>";
+				break;
+			}
 			case 404: {
 				error = "<h1>Error 404</h1><p>File Not Found</p>";
 				break;
@@ -23,8 +35,8 @@
 				break;
 			}
 		}
-		return `<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`;
-	}
+		return Buffer.from(`<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`);
+	};
 	function GetContentType(str) {
 		var s = str.split(/[.]/g);
 		switch (s[s.length - 1]) {
@@ -101,8 +113,8 @@
 					var fileSize = stats.size + 1;
 					FS.read(fd, {buffer: Buffer.alloc(fileSize)}, function(err, bytes, buffer) {
 						if(err !== null) return _fnDone(_file, "file not found", 404);//fnError(`- OpenFile request failed to read file -\n\t${_file}\n`);
-						var content = buffer.toString(encoding, 0, bytes);
-						_fnDone(PATH.resolve(_file), {text: buffer, raw: buffer}, 200);
+						//var content = buffer.toString(encoding, 0, bytes);
+						_fnDone(PATH.resolve(_file), buffer, 200);
 						FS.close(fd, function(err) {
 							if (err !== null) return;//console.log(`- OpenFile request failed to close file -\n\t${_file}\n`);
 						});
@@ -121,13 +133,28 @@
 		response.write(content);
 		response.end();
 	};*/
+	
+	function HttpCancelSocket(response) {
+		try {
+			response.destroy();
+			return response.socket.end();
+		}
+		catch (e) {
+			console.log("fatal error in HttpCancelSocket(): ", e);
+		}
+		return;
+	};
 
 	/*  */
-	function Post(request, response) {
+	function Post(request, response, httpResponse) {
 		try {
 			var chunk = [];
+			var type = null;
+			if (request.headers["content-type"])
+				type = request.headers["content-type"].split(";")[0];
+			
 			request.on("data", function(data) {
-				if (request.headers["content-type"] == "multipart/form-data")
+				if (type == "multipart/form-data")
 					return;
 				chunk[chunk.length] = data;
 			});
@@ -135,10 +162,10 @@
 			request.on("end", function() {
 				chunk = chunk.join('');
 				var pchunk = chunk;
-				var type = "";
-				if (request.headers["content-type"])
-					type = request.headers["content-type"].split(";")[0];
-				var headers = {"Content-Type": "text/html; charset=UTF-8"};
+				//var type = "";
+				//if (request.headers["content-type"])
+				//	type = request.headers["content-type"].split(";")[0];
+				var headers = {"Content-Type": GetContentType(".html")};
 				var status = 200;
 				switch(type) {
 					case "text/plain": { // debug
@@ -151,13 +178,19 @@
 						headers["Location"] = request.url;
 						break;
 					}
-					case "multipart/form-data": // form input type=file for file upload
-					default: {
-						//console.log("i am here");
-						status = 500;
+					case "multipart/form-data": {// form input type=file for file upload
+						/*status = 500;
 						pchunk = chunk;
-						chunk = Error(500, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
-						break; 
+						chunk = Error(status, "Illegal file upload has been logged");//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
+						headers["Content-Length"] = chunk.length;*/
+						return BadRequest(request, response, 500, "Illegal file upload has been logged");
+					}
+					default: {
+						//status = 400;
+						//pchunk = chunk;
+						//chunk = Error(status);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>File upload unsupported</div></body></html>"
+						//headers["Content-Length"] = chunk.length;
+						return BadRequest(request, response, 400);
 					}
 				};
 				response.writeHead(status, headers);
@@ -169,67 +202,60 @@
 		}
 		catch(e) {
 			console.log("fatal error in Post(): ", e);
+			return HttpCancelSocket(response);
 		};
 	};
 
 	/*  */
-	function Get(request, response) {
+	function Get(request, response, httpResponse) {
 		try {
-			var queryStrings = [];
-			var url = URL.parse(request.url, true);//.query
-			/*for(var str in url.query) // fix null prototype that URL.parse returns
-				queryStrings[str] = url.query[str];*/
-			if (url.pathname == "/")
-				url.pathname = "/index.html";
-			else if (url.pathname[url.pathname.length - 1] == "/")
-				url.pathname = [url.pathname, "/index.html"].join("");
-			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-			OpenFile(filename, 'utf8', function(filepath, contents, status) {
-				filepath = filepath || "";
-				//var splits = filepath.split(/[.]/g);
-				var type = "text/html; charset=UTF-8";
-				var content = Error(500);//"<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p></body></html>";
-				if (status == 200) {// && splits.length > 1) {
-					content = contents.text;
-					//var vl = splits[splits.length - 1].toLowerCase();
-					type = GetContentType(filename);
+			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
+				var type = GetContentType(".html");
+				if (status == 200) {
+					type = GetContentType(filepath);
+					response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
+					response.write(contents);
+					response.end();
+					console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
+					return;
 				}
-				else if (status == 404) {
-					content = Error(404);//"<!DOCTYPE html><html><head></head><body><h1>Error 404</h1><p>File Not Found</p></body></html>";
-				}
-
-				response.writeHead(status, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
-				response.write(content);
-				response.end();
+				return BadRequest(request, response, 404);
 			});
 		}
 		catch(e) {
 			console.log("fatal error in Get(): ", e);
+			return HttpCancelSocket(response);
 		}
 	};
-	function Head(request, response) {
+	function Head(request, response, httpResponse) {
 		try {
-			var url = URL.parse(request.url, true);//.query
-			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
-			var headers = {"Content-Type": "text/html; charset=UTF-8"};
-			OpenFile(filename, 'utf8', function(filepath, contents, status) {
+			var headers = {"Content-Type": GetContentType(".html")};
+			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
 				if (status == 200) {
-					headers["Content-Length"] = Buffer.byteLength(contents.text) - 1;
-					headers["Content-Type"] = GetContentType(filename);
+					headers["Content-Length"] = Buffer.byteLength(contents) - 1;
+					headers["Content-Type"] = GetContentType(filepath);
 				}
-				response.writeHead(status, headers);//{"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": type});
+				console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
+				response.writeHead(status, headers);
 				response.end();
 			});
 		}
 		catch(e) {
 			console.log("fatal error in Head(): ", e);
+			return HttpCancelSocket(response);
 		}
 	};
 
 	/*  */
-	function BadRequest(request, response, details) {
-		var content = Error(500, details);//`<!DOCTYPE html><html><head></head><body><h1>Error 500</h1><p>Internal Server Error</p><div>${details}</div></body></html>`;
-		response.writeHead(500, {"Content-Length": Buffer.byteLength(content) - 1, "Content-Type": "text/html; charset=UTF-8"});
+	function BadRequest(request, response, code, details) {
+		var content = Error(code, details);
+		var remoteAddress = request.headers["x-forwarded-for"];
+		var fromAddress = request.connection.remoteAddress;
+		var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
+		console.log("Rejected %s HTTP/%s request from %s\nError %s: %s\n",
+					request.method, request.httpVersion, fromString, code, details || "");
+		response.writeHead(code, {"Content-Length": Buffer.byteLength(content), 
+								  "Content-Type": GetContentType(".html")});
 		response.write(content);
 		response.end();
 	};
@@ -238,40 +264,48 @@
 	function HttpRequest(request, response) {
 		try {
 			var now = new Date();
+			console.log("=====\n", now);
+
 			var host = request.headers["host"];
 			var remoteAddress = request.headers["x-forwarded-for"];
 			var fromAddress = request.connection.remoteAddress;
 			var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
-			var url = URL.parse(request.url, true);
-			var filename = PATH.resolve(PATH.normalize(PATH.join(process.cwd(), url.pathname)));
 			if (hostname != null && (host == undefined || host.toLowerCase() != hostname.toLowerCase()))  {
-				console.log("=====\n%s\nCANCELED CONNECTIONS %s HTTP/%s request from %s\nMismatched hostname", 
-						now,
-						request.method, 
-						request.httpVersion,
-						fromString);
-				response.destroy();
-				return response.socket.end();
+				console.log("Rejected %s HTTP/%s request from %s\nMismatched hostname",
+							request.method, request.httpVersion, fromString);
+				return HttpCancelSocket(response);
 			}
-			console.log("=====\n%s\n%s HTTP/%s request from %s\nserving: %s\nrequested url: %s\n%o\n", 
-						now,
-						request.method, 
-						request.httpVersion,
-						fromString,
-						filename,
-						request.url,
-						request.headers);
+			
+			var httpResponse = {
+				url: null,
+				location: null,
+				queryStrings: [],
+				contentType: GetContentType(".html")
+			};
+			httpResponse.url = URL.parse(request.url, true);
+			if (httpResponse.url.pathname[httpResponse.url.pathname.length - 1] == "/") { // if end of pathname is / then append index.html
+				httpResponse.url.pathname = PATH.join(httpResponse.url.pathname, "/index.html");
+			};
+			httpResponse.location = PATH.resolve(PATH.normalize(PATH.join(wwwroot, httpResponse.url.pathname)));
+			if (!inRoot(httpResponse.location)) {
+				return BadRequest(request, response, 403, "Directory Traversal attempt has been logged.");
+			};
+			for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
+				httpResponse.queryStrings[str] = httpResponse.url.query[str];
+
+			console.log("%s HTTP/%s request from %s\nrequested pathname: %s\nserving resolved path: %s\n%o", 
+						request.method, request.httpVersion, fromString, httpResponse.url.pathname, httpResponse.location, request.headers);
 			switch(request.method.toUpperCase()) {
 				case 'POST': {
-					Post(request, response);
+					Post(request, response, httpResponse);
 					break;
 				}
 				case 'GET': {
-					Get(request, response);
+					Get(request, response, httpResponse);
 					break;
 				}
 				case 'HEAD': {
-					Head(request, response);
+					Head(request, response, httpResponse);
 					break;
 				}
 				case 'PUT':
@@ -281,26 +315,27 @@
 				case 'CONNECT':
 				case 'TRACE':
 				default: {
-					BadRequest(request, response, `Illegal ${request.method} requests has been logged.`);
+					BadRequest(request, response, 500, `Illegal ${request.method} request has been logged.`);
 					break;
 				}
 			}
 		}
 		catch(e) {
 			console.log("fatal error in HttpRequest(): ", e);
+			return HttpCancelSocket(response);
 		}
 	}
 	var WebServerStates = {
 		lastHttpRequestLogTime: new Date().getTime()
 	};
-
+	var wwwroot = process.cwd();
 	var hostname = null;
 	var sslEnabled = false;
 	var port = 8888;
-	var sslPort = 444;
-	var keyPath = "";
-	var certPath = "";
-	var opts = { timeout: 10000,requestTimeout: 1000, headersTimeout: 1000, key: "", cert: ""};
+	var sslPort = 8889;
+	var keyPath = null;
+	var certPath = null;
+	var opts = { timeout: 10000, requestTimeout: 1000, headersTimeout: 1000, key: null, cert: null};
 	if (process.argv.length > 1) {
 		for (var i = 1; i < process.argv.length; i++) {
 			var arg = process.argv[i].toLowerCase();
@@ -315,8 +350,6 @@
 				case "-sport":{
 					if (i+1 < process.argv.length)
 						sslPort = parseInt(process.argv[i+1]);
-					//opts.key = FS.readFileSync(opts.key);
-					//opts.cert = FS.readFileSync(opts.cert);
 					break;
 				}
 				case "-ssl":{
@@ -336,8 +369,28 @@
 				case "-hostname": {
 					if (i+1 < process.argv.length)
 						hostname = process.argv[i+1];
-					console.log("hostname is now %s", hostname);
+					console.log("set hostname to: %s", hostname);
 					break;
+				}
+				case "-wwwroot": {
+					if (i+1 < process.argv.length)
+						wwwroot = process.argv[i+1];
+					console.log("set wwwroot to: %s", hostname);
+					break;
+				}
+				case "-h":
+				case "-help": {
+					console.log("You have been helped.");
+					console.log("example cli usage:\twebserver -port 8888 -hostname mywebsite.com\n \
+								\t-p, -port [8888]:\t\tset the port the webserver will use for http connections\n \
+								\t-sp, -sport [8889]:\t\tset the port the webserver will use for https connections\n \
+								\t-ssl:\t\tstart https webserver, requires -key and -cert to be set\n \
+								\t-key [/path/to/key.key]:\t\tpath to ssl key file\n \
+								\t-cert [/path/to/cert.cert]:\t\tpath to ssl cert file\n \
+								\t-hostname [mywebsite.com]:\t\twebserver will only accept connections with a matching host header\n \
+								\t-wwwroot [/my/path]:\t\toverrides default current working directory\n \
+								\t-h, -help:\t\tunknown command\n");
+					return;
 				}
 				default: {
 					break;
@@ -355,7 +408,7 @@
 		var sslServer = HTTPS.createServer(opts, HttpRequest);cb
 		sslServer.listen(sslPort);
 		sslServer.setTimeout(opts.timeout);
-		console.log("webserverjs: listening on port %i (ssl)", sslPort);
+		console.log("webserverjs (ssl): listening on port %i", sslPort);
 	}
 
 })();
