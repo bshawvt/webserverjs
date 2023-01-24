@@ -261,8 +261,8 @@
 			var fromAddress = request.connection.remoteAddress;
 			var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
 			if (hostname != null && (host == undefined || host.toLowerCase() != hostname.toLowerCase()))  {
-				console.log("Rejected %s HTTP/%s request from %s\nMismatched hostname",
-							request.method, request.httpVersion, fromString);
+				console.log("Rejected %s HTTP/%s request from %s\nMismatched hostname\n%o\n",
+							request.method, request.httpVersion, fromString, request.headers);
 				return HttpCancelSocket(response);
 			}
 			
