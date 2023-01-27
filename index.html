@@ -73,7 +73,7 @@
 			}
 			function headRequest() {
 				var req = new XMLHttpRequest();
-				req.open("HEAD", "/test", true);
+				req.open("HEAD", "/robots.txt", true);
 				req.responseType = "json";
 				req.onreadystatechange = function() {
 					if (req.readyState == 4 && req.status == 200) {

@@ -50,47 +50,56 @@
 		return Buffer.from(`<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`);
 	};
 	function GetContentType(str) {
-		var s = str.split(/[.]/g);
-		switch (s[s.length - 1]) {
-			case "wav": {
+		//var s = str.split(/[.]/g);
+		var ext = str.substring(str.indexOf("."), str.length);
+		
+		//switch (s[s.length - 1]) {
+		switch(ext) {
+			case ".wav": {
 				return "audio/wav";
 			}
-			case "ogg": {
+			case ".ogg": {
 				return "audio/ogg";
 			}
-			case "mp3": {
+			case ".mp3": {
 				return "audio/mp3";
 			}
-			case "ico": {
+			case ".ico": {
 				return "image/x-icon";
 			}
-			case "gif": {
+			case ".gif": {
 				return "image/gif";
 			}
-			case "png": {
+			case ".png": {
 				return "image/png";
 			}
-			case "jpg":
-			case "jpeg": {
+			case ".jpg":
+			case ".jpeg": {
 				return "image/jpeg";
 			}
-			case "js": {
+			case ".js": {
 				return "text/javascript";
 			}
-			case "json": {
+			case ".json": {
 				return "application/json";
 			}
-			case "css": {
+			case ".css": {
 				return "text/css";
 			}
-			case "wasm": {
+			case ".wasm": {
 				return "application/wasm";
 			}
-			case "html":
-			case "htm": {
+			case ".html":
+			case ".htm": {
 				return "text/html; charset=UTF-8";
 			}
-			case "bin": {
+			case ".zip" :{
+				return "application/zip";
+			}
+			case ".tar.gz": {
+				return "applicationh/gzip";
+			}
+			case ".bin": {
 				return "application/octet-stream";
 			}
 			default: {
@@ -201,10 +210,34 @@
 			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
 				var type = GetContentType(".html");
 				if (status == 200) {
-					type = GetContentType(filepath);
-					response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
+					type = GetContentType(filepath)
+					/*response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
 					response.write(contents);
-					response.end();
+					response.end();*/
+					var totalBytes = Buffer.byteLength(contents) - 1;
+					var writtenBytes = 0;
+					var nextBytes = 0;
+
+					response.writeHead(status, {"Content-Length": totalBytes, "Content-Type": type});
+					function write() {
+						clearTimeout(sendTimeout);
+						
+						if (writtenBytes + 100 >= totalBytes)
+							nextBytes = totalBytes;
+						else
+							nextBytes += 100;
+						//console.log(contents);
+						var chunk = contents.slice(writtenBytes, nextBytes);//Buffer.from(contents, writtenBytes, nextBytes);
+						console.log("sending a chunk of size: ", chunk.length);
+						response.write(chunk);//contents.splice(writtenBytes, nextBytes));
+						writtenBytes = nextBytes;
+						if(writtenBytes == totalBytes) {
+							console.log("am i here");
+							return response.end();
+						};
+						sendTimeout = setTimeout(write, 200 );
+					};
+					var sendTimeout = setTimeout(write, 100 );
 					console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
 					return;
 				};
