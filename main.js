@@ -221,21 +221,16 @@
 					response.writeHead(status, {"Content-Length": totalBytes, "Content-Type": type});
 					function write() {
 						clearTimeout(sendTimeout);
-						
-						if (writtenBytes + 100 >= totalBytes)
+						if (writtenBytes + 10 >= totalBytes)
 							nextBytes = totalBytes;
 						else
-							nextBytes += 100;
-						//console.log(contents);
-						var chunk = contents.slice(writtenBytes, nextBytes);//Buffer.from(contents, writtenBytes, nextBytes);
-						//console.log("sending a chunk of size: ", chunk.length);
-						response.write(chunk);//contents.splice(writtenBytes, nextBytes));
+							nextBytes += 10;
+						response.write(contents.slice(writtenBytes, nextBytes));
 						writtenBytes = nextBytes;
 						if(writtenBytes == totalBytes) {
-							//console.log("am i here");
 							return response.end();
 						};
-						sendTimeout = setTimeout(write, 200 );
+						sendTimeout = setTimeout(write, 100 );
 					};
 					var sendTimeout = setTimeout(write, 100 );
 					console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
