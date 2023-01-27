@@ -221,10 +221,10 @@
 					response.writeHead(status, {"Content-Length": totalBytes, "Content-Type": type});
 					function write() {
 						clearTimeout(sendTimeout);
-						if (writtenBytes + 10 >= totalBytes)
+						if (writtenBytes + 1000 >= totalBytes)
 							nextBytes = totalBytes;
 						else
-							nextBytes += 10;
+							nextBytes += 1000;
 						response.write(contents.slice(writtenBytes, nextBytes));
 						writtenBytes = nextBytes;
 						if(writtenBytes == totalBytes) {
