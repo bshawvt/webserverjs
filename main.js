@@ -228,11 +228,11 @@
 							nextBytes += 100;
 						//console.log(contents);
 						var chunk = contents.slice(writtenBytes, nextBytes);//Buffer.from(contents, writtenBytes, nextBytes);
-						console.log("sending a chunk of size: ", chunk.length);
+						//console.log("sending a chunk of size: ", chunk.length);
 						response.write(chunk);//contents.splice(writtenBytes, nextBytes));
 						writtenBytes = nextBytes;
 						if(writtenBytes == totalBytes) {
-							console.log("am i here");
+							//console.log("am i here");
 							return response.end();
 						};
 						sendTimeout = setTimeout(write, 200 );
