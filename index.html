@@ -29,7 +29,7 @@
 		<script type="application/javascript">
 			function getRequest() {
 				var req = new XMLHttpRequest();
-				req.open("GET", "/", true);
+				req.open("GET", "/hello.txt", true);
 				req.responseType = "json";
 				req.onreadystatechange = function() {
 					if (req.readyState == 4 && req.status == 200) {
@@ -73,7 +73,7 @@
 			}
 			function headRequest() {
 				var req = new XMLHttpRequest();
-				req.open("HEAD", "/robots.txt", true);
+				req.open("HEAD", "/hello.txt", true);
 				req.responseType = "json";
 				req.onreadystatechange = function() {
 					if (req.readyState == 4 && req.status == 200) {

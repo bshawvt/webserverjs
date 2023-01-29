@@ -54,6 +54,7 @@
 		var ext = str.substring(str.indexOf("."), str.length);
 		
 		//switch (s[s.length - 1]) {
+		//{type: , encoding: "utf8" };
 		switch(ext) {
 			case ".wav": {
 				return "audio/wav";
@@ -108,7 +109,7 @@
 		};
 	};
 	// fnDone(filename, error, errorMessage)
-	function SaveFile(file, encoding, data, fnDone) {
+	/*function SaveFile(file, encoding, data, fnDone) {
 		FS.open(file, 'w+', function(err, fd) {
 			if(err !== null) return fnDone(file, true, err);//console.log(`- OpenFile request failed to open file -\n\t${_file}\n`);
 			FS.write(fd, data, function(err, bytesWritten, buffer) {
@@ -119,9 +120,9 @@
 				});
 			});
 		});
-	};
+	};*/
 	// fnDone: file, data, status
-	function OpenFile(file, encoding, fnDone, fnError) {
+	/*function OpenFile(file, encoding, fnDone, fnError) {
 		((_file, _encoding, _fnDone, _fnError) => {
 			_fnDone = _fnDone || (() => {});
 			_fnError = _fnError || (() => {});
@@ -141,7 +142,7 @@
 				});
 			});
 		})(file, encoding, fnDone, fnError);
-	};
+	};*/
 
 	function HttpCancelSocket(response) {
 		try {
@@ -205,15 +206,15 @@
 	};
 
 	/*  */
-	function Get(request, response, httpResponse) {
+	/*function Get(request, response, httpResponse) {
 		try {
 			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
 				var type = GetContentType(".html");
 				if (status == 200) {
 					type = GetContentType(filepath)
-					/*response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
-					response.write(contents);
-					response.end();*/
+					//response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
+					//response.write(contents);
+					//response.end();
 					var totalBytes = Buffer.byteLength(contents) - 1;
 					var writtenBytes = 0;
 					var nextBytes = 0;
@@ -221,10 +222,10 @@
 					response.writeHead(status, {"Content-Length": totalBytes, "Content-Type": type});
 					function write() {
 						clearTimeout(sendTimeout);
-						if (writtenBytes + 1000 >= totalBytes)
+						if (writtenBytes + rate >= totalBytes)
 							nextBytes = totalBytes;
 						else
-							nextBytes += 1000;
+							nextBytes += rate;
 						response.write(contents.slice(writtenBytes, nextBytes));
 						writtenBytes = nextBytes;
 						if(writtenBytes == totalBytes) {
@@ -243,10 +244,73 @@
 			console.log("fatal error in Get(): ", e);
 			return HttpCancelSocket(response);
 		}
+	};*/
+	function Get(request, response, httpResponse) {
+		var type = GetContentType(".html");
+		var totalBytes = 0;
+
+		FS.open(httpResponse.location, 'r', function(err, fd) {
+			if(err !== null)
+				return BadRequest(request, response, 404);
+			FS.fstat(fd, function(err, stats) {
+				try {
+					if (err !== null) 
+						return BadRequest(request, response, 404);
+					var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: rate});
+					response.writeHead(200, {"Content-Length": stats.size, "Content-Type": GetContentType(httpResponse.location)});
+					stream.on("error", function(error) {
+						return BadRequest(request, response, 404);
+					});
+					stream.on("close", function() {
+						FS.close(fd, function(err) {
+							if (err !== null) return;
+						});
+					});
+					stream.on("end", function() {
+						return response.end();
+					});
+					stream.on("data", function(chunk) {
+						response.write(chunk);
+						stream.pause();
+						var timer = setTimeout(function() {
+							clearTimeout(timer);
+							stream.resume();
+						}, 100);
+					});
+				}
+				catch(e) {
+					console.log("fatal error in Get().fstat(): ", e);
+					FS.close(fd, function(err) {
+						if (err !== null) return;
+					});
+					return HttpCancelSocket(response);
+				};
+			});
+		});
+
 	};
 	function Head(request, response, httpResponse) {
 		try {
-			var headers = {"Content-Type": GetContentType(".html")};
+			FS.open(httpResponse.location, 'r', function(err, fd) {
+				if(err !== null)
+					return BadRequest(request, response, 404);
+				FS.fstat(fd, function(err, stats) {
+					try {
+						FS.close(fd, function(err) {
+							if (err !== null) return;
+						});
+						if (err !== null)
+							return BadRequest(request, response, 404);
+						response.writeHead(200, {"Content-Length":stats.size,"Content-Type": GetContentType(httpResponse.location)});
+						response.end();
+					}
+					catch(e) {
+						console.log("fatal error in Get().fstat(): ", e);
+						return HttpCancelSocket(response);
+					};
+				});
+			});
+			/*var headers = {"Content-Type": GetContentType(".html")};
 			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
 				if (status == 200) {
 					headers["Content-Length"] = Buffer.byteLength(contents) - 1;
@@ -256,7 +320,7 @@
 				response.writeHead(status, headers);
 				response.end();
 				return;
-			});
+			});*/
 		}
 		catch(e) {
 			console.log("fatal error in Head(): ", e);
@@ -344,17 +408,16 @@
 			return HttpCancelSocket(response);
 		}
 	}
-	var WebServerStates = {
-		lastHttpRequestLogTime: new Date().getTime()
-	};
+
 	var wwwroot = process.cwd();
+	var rate = 65536;
 	var hostname = null;
 	var sslEnabled = false;
 	var port = 8888;
 	var sslPort = 8889;
 	var keyPath = null;
 	var certPath = null;
-	var opts = { timeout: 10000, requestTimeout: 1000, headersTimeout: 1000, key: null, cert: null};
+	var opts = { timeout: 10000, requestTimeout: 5000, headersTimeout: 5000, key: null, cert: null};
 	if (process.argv.length > 1) {
 		for (var i = 1; i < process.argv.length; i++) {
 			var arg = process.argv[i].toLowerCase();
@@ -397,6 +460,12 @@
 					console.log("set wwwroot to: %s", hostname);
 					break;
 				}
+				case "-rate": {
+					if (i+1 < process.argv.length)
+						rate = process.argv[i+1];
+					console.log("set rate to: %s", rate);
+					break;
+				}
 				case "-h":
 				case "-help": {
 					console.log("You have been helped.");
@@ -408,6 +477,7 @@
 								\t-cert [/path/to/cert.cert]:\t\tpath to ssl cert file\n \
 								\t-hostname [mywebsite.com]:\t\twebserver will only accept connections with a matching host header\n \
 								\t-wwwroot [/my/path]:\t\toverrides default current working directory\n \
+								\t-rate [1000]:\t\tdata transfer rate in bytes per 100ms \
 								\t-h, -help:\t\tunknown command\n");
 					return;
 				}
