@@ -98,8 +98,8 @@
 				return "application/zip";
 			}
 			case ".tar.gz": {
-				//return "applicationh/gzip";
-				return "application/x-tar";
+				return "applicationh/gzip";
+				//return "application/x-tar";
 			}
 			case ".bin": {
 				return "application/octet-stream";
