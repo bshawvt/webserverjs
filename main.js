@@ -233,7 +233,6 @@
 	};
 	function FindInclude(currentFile, chunk) {
 		var chunkParse = [];
-		var parsedChunk = Buffer.alloc(0);
 		var start = 0;
 		var end = 0;
 		for(var i = 0; i < chunk.length; i++) {
@@ -250,13 +249,13 @@
 			|| (chunkParse.length == 10 && chunk[i] == 100)	// d
 			|| (chunkParse.length == 11 && chunk[i] == 101)	// e
 			|| (chunkParse.length == 12 && chunk[i] == 32)){// space 
-				chunkParse[chunkParse.length] = String.fromCharCode(chunk[i]);
+				chunkParse.push(String.fromCharCode(chunk[i]));
 				if (chunkParse.length == 1) {
 					start = i;
 				};
 			}
 			else if (chunkParse.length >= 13) {
-				chunkParse[chunkParse.length] = String.fromCharCode(chunk[i]);
+				chunkParse.push(String.fromCharCode(chunk[i]));
 				if (chunkParse[chunkParse.length - 4]	 == " "	// space
 					&& chunkParse[chunkParse.length - 3] == "-"	// -
 					&& chunkParse[chunkParse.length - 2] == "-"	// -
@@ -480,15 +479,12 @@
 				console.log("Rejected %s HTTP/%s request from %s\nMismatched hostname\n%o\n",
 							request.method, request.httpVersion, fromString, request.headers);
 				return HttpCancelSocket(response);
-			}
-			
+			};
 			var httpResponse = {
-				url: null,
+				url: URL.parse(request.url, true),
 				location: null,
-				queryStrings: [],
 				contentType: GetContentType(".html")
 			};
-			httpResponse.url = URL.parse(request.url, true);
 			if (httpResponse.url.pathname[httpResponse.url.pathname.length - 1] == "/") { // if end of pathname is / then append index.html
 				httpResponse.url.pathname = PATH.join(httpResponse.url.pathname, "/index.html");
 			};
@@ -497,8 +493,11 @@
 				console.log("Request rejected for resource: %s", httpResponse.location);
 				return BadRequest(request, response, 403, "Directory Traversal attempt has been logged.");
 			};
-			for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
+			/*for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
 				httpResponse.queryStrings[str] = httpResponse.url.query[str];
+				//httpResponse.queryStrings.set(str, httpResponse.url.query[str]);
+			for(var str in httpResponse.queryStrings)
+				console.log(httpResponse.queryStrings[str]);*/
 			if (!noHeaderSpam)
 			console.log("%s HTTP/%s request from %s\nrequested pathname: %s\nserving resolved path: %s\n%o", 
 						request.method, request.httpVersion, fromString, httpResponse.url.pathname, httpResponse.location, request.headers);
@@ -532,7 +531,7 @@
 
 	var wwwroot = process.cwd();
 	var rate = 65536;
-	var noHeaderSpam = false;
+	var noHeaderSpam = true;
 	var hostname = null;
 	var sslEnabled = false;
 	var port = 8888;
