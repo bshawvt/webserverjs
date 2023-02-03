@@ -561,9 +561,10 @@
 								\t-cert [/path/to/cert.cert]:\t\tpath to ssl cert file\n \
 								\t-hostname [mywebsite.com]:\t\twebserver will only accept connections with a matching host header\n \
 								\t-wwwroot [/my/path]:\t\toverrides default current working directory\n \
-								\t-rate [1000]:\t\tdata transfer rate in bytes per 100ms \
+								\t-rate [1000]:\t\tdata transfer rate in bytes per 100ms\n \
+								\t-nhs, -noheaderspam:\t\twhen toggled, header spam will be skipped\n \
 								\t-h, -help:\t\tunknown command\n");
-					break;
+					return;
 				}
 				case "-nhs":
 				case "-noheaderspam": {
