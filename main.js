@@ -190,7 +190,6 @@
 		};
 	};
 
-	
 	function GetStream(request, response, httpResponse) {
 		var type = GetContentType(".html");
 		FS.open(httpResponse.location, 'r', function(err, fd) {
@@ -338,37 +337,40 @@
 		try {
 			if (httpResponse.contentType == GetContentType(".html")) { 
 				// todo
-				function onProcessingComplete(buffer) {
-					//console.log(buffer.toString("utf8", 0));
-					response.writeHead(200, {"Content-Length":buffer.length,"Content-Type": GetContentType(httpResponse.location)});
-					response.write(buffer);
-					response.end();
-				};
-				function ProcessStream(buffer, rootFile, onDone) {
-					var found = FindInclude(rootFile, buffer);
-					if (found != null) {
-						((_item, _buffer) => {
-							StreamContents(_item.include, function(nextBuffer, nextSize) {
-								var centerBuffer = nextBuffer;
-								if (nextSize == -1) {
-									centerBuffer = Error(404);
-								}
-								startBuffer = _buffer.subarray(0, _item.start);
-								endBuffer = buffer.subarray(_item.end, buffer.length);
-								buffer = Buffer.concat([startBuffer, centerBuffer, endBuffer]);
-								ProcessStream(buffer, rootFile, onDone);
-							});
-						})(found, buffer);
-					}
-					else {
-						onDone(buffer);
+				(() => {
+					function onProcessingComplete(buffer) {
+						//console.log(buffer.toString("utf8", 0));
+						response.writeHead(200, {"Content-Length":buffer.length,"Content-Type": GetContentType(httpResponse.location)});
+						response.write(buffer);
+						response.end();
 					};
-				};
-				StreamContents(httpResponse.location, function(buffer, size) {
-					if (size == -1)
-						return BadRequest(request, response, 404);
-					ProcessStream(buffer, httpResponse.location, onProcessingComplete);
-				});
+					function StreamMixer(buffer, rootFile, onDone) {
+						var found = FindInclude(rootFile, buffer);
+						if (found != null) {
+							((_item, _buffer) => {
+								StreamContents(_item.include, function(nextBuffer, nextSize) {
+									var centerBuffer = nextBuffer;
+									if (nextSize == -1) {
+										centerBuffer = Error(404);
+									}
+									startBuffer = _buffer.subarray(0, _item.start);
+									endBuffer = buffer.subarray(_item.end, buffer.length);
+									buffer = Buffer.concat([startBuffer, centerBuffer, endBuffer]);
+									StreamMixer(buffer, rootFile, onDone);
+								});
+							})(found, buffer);
+						}
+						else {
+							onDone(buffer);
+						};
+					};
+					StreamContents(httpResponse.location, function(buffer, size) {
+						if (size == -1)
+							return BadRequest(request, response, 404);
+						StreamMixer(buffer, httpResponse.location, onProcessingComplete);
+					});
+				
+				})();
 			}
 			else {
 				return GetStream(request, response, httpResponse);
@@ -382,7 +384,7 @@
 	};
 	function Head(request, response, httpResponse) {
 		try {
-			FS.open(httpResponse.location, 'r', function(err, fd) {
+			/*FS.open(httpResponse.location, 'r', function(err, fd) {
 				if(err !== null)
 					return BadRequest(request, response, 404);
 				FS.fstat(fd, function(err, stats) {
@@ -400,7 +402,43 @@
 						return HttpCancelSocket(response);
 					};
 				});
-			});
+			});*/
+			
+			(() => {
+			
+				function onProcessingComplete(buffer) {
+					//console.log(buffer.toString("utf8", 0));
+					response.writeHead(200, {"Content-Length":buffer.length,"Content-Type": GetContentType(httpResponse.location)});
+					//response.write(buffer);
+					response.end();
+				};
+				function StreamMixer(buffer, rootFile, onDone) {
+					var found = FindInclude(rootFile, buffer);
+					if (found != null) {
+						((_item, _buffer) => {
+							StreamContents(_item.include, function(nextBuffer, nextSize) {
+								var centerBuffer = nextBuffer;
+								if (nextSize == -1) {
+									centerBuffer = Error(404);
+								}
+								startBuffer = _buffer.subarray(0, _item.start);
+								endBuffer = buffer.subarray(_item.end, buffer.length);
+								buffer = Buffer.concat([startBuffer, centerBuffer, endBuffer]);
+								StreamMixer(buffer, rootFile, onDone);
+							});
+						})(found, buffer);
+					}
+					else {
+						onDone(buffer);
+					};
+				};
+				StreamContents(httpResponse.location, function(buffer, size) {
+					if (size == -1)
+						return BadRequest(request, response, 404);
+					StreamMixer(buffer, httpResponse.location, onProcessingComplete);
+				});
+				
+			})();
 		}
 		catch(e) {
 			console.log("fatal error in Head(): ", e);
