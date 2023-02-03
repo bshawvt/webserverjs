@@ -109,24 +109,9 @@
 			}
 		};
 	};
-	// fnDone(filename, error, errorMessage)
-	/*function SaveFile(file, encoding, data, fnDone) {
-		FS.open(file, 'w+', function(err, fd) {
-			if(err !== null) return fnDone(file, true, err);//console.log(`- OpenFile request failed to open file -\n\t${_file}\n`);
-			FS.write(fd, data, function(err, bytesWritten, buffer) {
-				if (err != null) return fnDone(file, true, err);
-				FS.close(fd, function(err) {
-					if (err !== null) return;//console.log(`- OpenFile request failed to close file -\n\t${_file}\n`);
-					fnDone(file, false);
-				});
-			});
-		});
-	};*/
-	// fnDone: file, data, status
-	/*function OpenFile(file, encoding, fnDone, fnError) {
-		((_file, _encoding, _fnDone, _fnError) => {
+	function OpenFile(file, encoding, fnDone) {
+		((_file, _encoding, _fnDone) => {
 			_fnDone = _fnDone || (() => {});
-			_fnError = _fnError || (() => {});
 			var encoding = _encoding || 'utf8';
 			FS.open(_file, 'r', function(err, fd) {
 				if(err !== null) return _fnDone(_file, "file not found", 404);//console.log(`- OpenFile request failed to open file -\n\t${_file}\n`);
@@ -142,9 +127,8 @@
 					});
 				});
 			});
-		})(file, encoding, fnDone, fnError);
-	};*/
-
+		})(file, encoding, fnDone);
+	};
 	function HttpCancelSocket(response) {
 		try {
 			response.destroy();
@@ -206,50 +190,9 @@
 		};
 	};
 
-	/*  */
-	/*function Get(request, response, httpResponse) {
-		try {
-			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
-				var type = GetContentType(".html");
-				if (status == 200) {
-					type = GetContentType(filepath)
-					//response.writeHead(status, {"Content-Length": Buffer.byteLength(contents) - 1, "Content-Type": type});
-					//response.write(contents);
-					//response.end();
-					var totalBytes = Buffer.byteLength(contents) - 1;
-					var writtenBytes = 0;
-					var nextBytes = 0;
-
-					response.writeHead(status, {"Content-Length": totalBytes, "Content-Type": type});
-					function write() {
-						clearTimeout(sendTimeout);
-						if (writtenBytes + rate >= totalBytes)
-							nextBytes = totalBytes;
-						else
-							nextBytes += rate;
-						response.write(contents.slice(writtenBytes, nextBytes));
-						writtenBytes = nextBytes;
-						if(writtenBytes == totalBytes) {
-							return response.end();
-						};
-						sendTimeout = setTimeout(write, 100 );
-					};
-					var sendTimeout = setTimeout(write, 100 );
-					console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
-					return;
-				};
-				return BadRequest(request, response, 404);
-			});
-		}
-		catch(e) {
-			console.log("fatal error in Get(): ", e);
-			return HttpCancelSocket(response);
-		}
-	};*/
-	function Get(request, response, httpResponse) {
+	
+	function GetStream(request, response, httpResponse) {
 		var type = GetContentType(".html");
-		var totalBytes = 0;
-
 		FS.open(httpResponse.location, 'r', function(err, fd) {
 			if(err !== null)
 				return BadRequest(request, response, 404);
@@ -257,8 +200,8 @@
 				try {
 					if (err !== null) 
 						return BadRequest(request, response, 404);
-					var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: rate});
-					response.writeHead(200, {"Content-Length": stats.size, "Content-Type": GetContentType(httpResponse.location)});
+					var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: rate });
+					response.writeHead(200, {"Content-Length": stats.size, "Content-Type": httpResponse.contentType});
 					stream.on("error", function(error) {
 						return BadRequest(request, response, 404);
 					});
@@ -280,7 +223,7 @@
 					});
 				}
 				catch(e) {
-					console.log("fatal error in Get().fstat(): ", e);
+					console.log("fatal error in StreamGet().fstat(): ", e);
 					FS.close(fd, function(err) {
 						if (err !== null) return;
 					});
@@ -288,7 +231,154 @@
 				};
 			});
 		});
+	};
+	function FindInclude(currentFile, chunk) {
+		var chunkParse = [];
+		var parsedChunk = Buffer.alloc(0);
+		var start = 0;
+		var end = 0;
+		for(var i = 0; i < chunk.length; i++) {
+			if ((chunkParse.length == 0 && chunk[i] == 60)	// <
+			|| (chunkParse.length == 1 && chunk[i] == 33)	// !
+			|| (chunkParse.length == 2 && chunk[i] == 45)	// -
+			|| (chunkParse.length == 3 && chunk[i] == 45)	// -
+			|| (chunkParse.length == 4 && chunk[i] == 35)	// #
+			|| (chunkParse.length == 5 && chunk[i] == 105)	// i
+			|| (chunkParse.length == 6 && chunk[i] == 110)	// n
+			|| (chunkParse.length == 7 && chunk[i] == 99) 	// c
+			|| (chunkParse.length == 8 && chunk[i] == 108)	// l
+			|| (chunkParse.length == 9 && chunk[i] == 117)	// u
+			|| (chunkParse.length == 10 && chunk[i] == 100)	// d
+			|| (chunkParse.length == 11 && chunk[i] == 101)	// e
+			|| (chunkParse.length == 12 && chunk[i] == 32)){// space 
+				chunkParse[chunkParse.length] = String.fromCharCode(chunk[i]);
+				if (chunkParse.length == 1) {
+					start = i;
+				};
+			}
+			else if (chunkParse.length >= 13) {
+				chunkParse[chunkParse.length] = String.fromCharCode(chunk[i]);
+				if (chunkParse[chunkParse.length - 4]	 == " "	// space
+					&& chunkParse[chunkParse.length - 3] == "-"	// -
+					&& chunkParse[chunkParse.length - 2] == "-"	// -
+					&& chunk[i] == 62) {						// >
+					// whatever, found the end delimiter
+					var chunkString = chunkParse.join("");
+					var chunkEqualPosition = chunkString.indexOf("=");
+					var chunkType = chunkString.substring(13, chunkEqualPosition);
+					var chunkFilename = chunkString.substring(chunkEqualPosition+2, chunkString.indexOf(" -->") - 1);
+					end = i+1;
 
+					var includeFile = null;
+					if (chunkType == "file")
+						includeFile = PATH.resolve(PATH.normalize(PATH.join(currentFile, "../", chunkFilename)));
+					else if (chunkType == "virtual")
+						includeFile = PATH.resolve(PATH.normalize(PATH.join(wwwroot, chunkFilename)));
+					//console.log("resolved: %s", includeFile);
+					if (inRoot(includeFile)) {
+						return {start: start, end: end, include: includeFile};
+					};
+					// reset state for more potential includes
+					// todo: not used anymore
+					chunkParse = [];
+					start = 0;
+					end = 0;
+				}
+			}
+			else { // the delimiter set is invalid
+				chunkParse = [];
+				start = 0;
+				end = 0;
+			}
+		};
+		return null;
+	};
+	function StreamContents(filename, onDone) {
+		FS.open(filename, 'r', function(err, fd) {
+			if(err !== null) {
+				return onDone(null, -1);
+			}
+			//FS.fstat(fd, function(err, stats) {
+			try {
+				var chunkBuffer = [];
+				if (err !== null) {
+					return onDone(null, -1);
+				}
+				var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: 65536 });
+				stream.on("error", function(error) {
+					return onDone(null, -1);
+				});
+				stream.on("close", function() {
+					//FS.close(fd, function(err) {
+					//	console.log("done");
+					//	if (err !== null) {
+					//		console.log("4", err);
+					//		return;
+					//	}
+					//});
+				});
+				stream.on("end", function() {
+					return onDone(Buffer.concat(chunkBuffer), chunkBuffer.length);
+				});
+				stream.on("data", function(chunk) {
+					chunkBuffer.push(chunk);//Buffer.concat([chunkBuffer, chunk]);
+				});
+			}
+			catch(e) {
+				console.log("fatal error in StreamFile().fstat(): ", e);
+				FS.close(fd, function(err) {
+					if (err !== null) return onDone(null, -1);
+				});
+				return;
+			};
+		});
+		//});
+	};
+	function Get(request, response, httpResponse) {
+		try {
+			if (httpResponse.contentType == GetContentType(".html")) { 
+				// todo
+				function onProcessingComplete(buffer) {
+					//console.log(buffer.toString("utf8", 0));
+					response.writeHead(200, {"Content-Length":buffer.length,"Content-Type": GetContentType(httpResponse.location)});
+					response.write(buffer);
+					response.end();
+				};
+				function ProcessStream(buffer, rootFile, onDone) {
+					var found = FindInclude(rootFile, buffer);
+					if (found != null) {
+						((_item, _buffer) => {
+							StreamContents(_item.include, function(nextBuffer, nextSize) {
+								var centerBuffer = nextBuffer;
+								if (nextSize == -1) {
+									centerBuffer = Error(404);
+								}
+								startBuffer = _buffer.subarray(0, _item.start);
+								endBuffer = buffer.subarray(_item.end, buffer.length);
+								buffer = Buffer.concat([startBuffer, centerBuffer, endBuffer]);
+								ProcessStream(buffer, rootFile, onDone);
+							});
+						})(found, buffer);
+					}
+					else {
+						onDone(buffer);
+					};
+				};
+				StreamContents(httpResponse.location, function(buffer, size) {
+					if (size == -1)
+						return BadRequest(request, response, 404);
+					ProcessStream(buffer, httpResponse.location, onProcessingComplete);
+				});
+			}
+			else {
+				return GetStream(request, response, httpResponse);
+			};
+		}
+		catch(e) {
+			console.log("fatal error in Get():", e);
+			return HttpCancelSocket(response);
+		};
+		
 	};
 	function Head(request, response, httpResponse) {
 		try {
@@ -311,17 +401,6 @@
 					};
 				});
 			});
-			/*var headers = {"Content-Type": GetContentType(".html")};
-			OpenFile(httpResponse.location, 'utf8', function(filepath, contents, status) {
-				if (status == 200) {
-					headers["Content-Length"] = Buffer.byteLength(contents) - 1;
-					headers["Content-Type"] = GetContentType(filepath);
-				};
-				console.log("Served %i bytes", Buffer.byteLength(contents) - 1);
-				response.writeHead(status, headers);
-				response.end();
-				return;
-			});*/
 		}
 		catch(e) {
 			console.log("fatal error in Head(): ", e);
@@ -331,16 +410,22 @@
 
 	/*  */
 	function BadRequest(request, response, code, details) {
-		var content = Error(code, details);
-		var remoteAddress = request.headers["x-forwarded-for"];
-		var fromAddress = request.connection.remoteAddress;
-		var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
-		console.log("Rejected %s HTTP/%s request from %s\nError %s: %s\n",
-					request.method, request.httpVersion, fromString, code, details || "");
-		response.writeHead(code, {"Content-Length": Buffer.byteLength(content), 
-								  "Content-Type": GetContentType(".html")});
-		response.write(content);
-		response.end();
+		try {
+			var content = Error(code, details);
+			var remoteAddress = request.headers["x-forwarded-for"];
+			var fromAddress = request.connection.remoteAddress;
+			var fromString = remoteAddress ? `${remoteAddress}(${fromAddress})` : fromAddress;
+			console.log("Rejected %s HTTP/%s request from %s\nError %s: %s\n",
+						request.method, request.httpVersion, fromString, code, details || "");
+			response.writeHead(code, {"Content-Length": Buffer.byteLength(content), 
+									  "Content-Type": GetContentType(".html")});
+			response.write(content);
+			return response.end();
+		}
+		catch(e) {
+			console.log("fatal error in BadRequest(): ", e);
+			return HttpCancelSocket(response);
+		};
 	};
 	
 	/*  */
@@ -376,21 +461,19 @@
 			};
 			for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
 				httpResponse.queryStrings[str] = httpResponse.url.query[str];
-
+			if (!noHeaderSpam)
 			console.log("%s HTTP/%s request from %s\nrequested pathname: %s\nserving resolved path: %s\n%o", 
 						request.method, request.httpVersion, fromString, httpResponse.url.pathname, httpResponse.location, request.headers);
+			httpResponse.contentType = GetContentType(httpResponse.location);
 			switch(request.method.toUpperCase()) {
 				case 'POST': {
-					Post(request, response, httpResponse);
-					break;
+					return Post(request, response, httpResponse);
 				}
 				case 'GET': {
-					Get(request, response, httpResponse);
-					break;
+					return Get(request, response, httpResponse);
 				}
 				case 'HEAD': {
-					Head(request, response, httpResponse);
-					break;
+					return Head(request, response, httpResponse);
 				}
 				case 'PUT':
 				case 'DELETE':
@@ -399,8 +482,7 @@
 				case 'CONNECT':
 				case 'TRACE':
 				default: {
-					BadRequest(request, response, 500, `Illegal ${request.method} request has been logged.`);
-					break;
+					return BadRequest(request, response, 500, `Illegal ${request.method} request has been logged.`);
 				}
 			}
 		}
@@ -412,6 +494,7 @@
 
 	var wwwroot = process.cwd();
 	var rate = 65536;
+	var noHeaderSpam = false;
 	var hostname = null;
 	var sslEnabled = false;
 	var port = 8888;
@@ -480,7 +563,13 @@
 								\t-wwwroot [/my/path]:\t\toverrides default current working directory\n \
 								\t-rate [1000]:\t\tdata transfer rate in bytes per 100ms \
 								\t-h, -help:\t\tunknown command\n");
-					return;
+					break;
+				}
+				case "-nhs":
+				case "-noheaderspam": {
+					console.log("set no header spam to true");
+					noHeaderSpam = true;
+					break;
 				}
 				default: {
 					break;
