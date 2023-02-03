@@ -1,7 +1,7 @@
 var net = require("net");
 var path = require("path");
 
-function httpClient(host, port, url, hostHeader, dontUseHeader) {
+function httpClient(type, host, port, url, hostHeader, dontUseHeader) {
 	var client = new net.Socket();
 	client.connect({host: host, port: port}, function(a, b, c) {
 		//console.log(a, b, c);
@@ -14,7 +14,7 @@ function httpClient(host, port, url, hostHeader, dontUseHeader) {
 		//console.log("on close:", a, b, c);
 	});
 	client.on("data", function(a, b, c) {
-		console.log("on data:", a.toString("utf8", 0, a.length - 1), b, c);
+		console.log("on data:", a.toString("utf8", 0, a.length));
 	});
 	client.on("end", function(a, b, c) {
 		//console.log("on end:", a, b, c);
@@ -23,10 +23,10 @@ function httpClient(host, port, url, hostHeader, dontUseHeader) {
 		//console.log("on error:", a, b, c);
 	});
 	client.on("ready", function(a, b, c) {
-		var headers = [`GET ${url} HTTP/1.1`, dontUseHeader ? "" : `Host: ${hostHeader}`, "\r\n"].join("\r\n");
+		var headers = [`${type} ${url} HTTP/1.1`, dontUseHeader ? "" : `Host: ${hostHeader}`, "\r\n"].join("\r\n");
 		console.log("sent: ", headers);
 		client.write(headers);
 	});
 
 };
-httpClient("localhost", 80, "/etc/passwd", "localhost:80");
+httpClient("GET", "localhost", 8888, "/../../../../../etc/passwd", "localhost:8888");
