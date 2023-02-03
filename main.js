@@ -531,7 +531,7 @@
 
 	var wwwroot = process.cwd();
 	var rate = 65536;
-	var noHeaderSpam = true;
+	var noHeaderSpam = false;
 	var hostname = null;
 	var sslEnabled = false;
 	var port = 8888;
