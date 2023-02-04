@@ -583,7 +583,7 @@
 				}
 				case "-rate": {
 					if (i+1 < process.argv.length)
-						rate = process.argv[i+1];
+						rate = parseInt(process.argv[i+1]);
 					console.log("set rate to: %s", rate);
 					break;
 				}
