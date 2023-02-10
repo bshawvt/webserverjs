@@ -50,58 +50,63 @@
 		return Buffer.from(`<!DOCTYPE html><html><head></head><body>${error}${extra}</body></html>`);
 	};
 	function GetContentType(str) {
-		//var s = str.split(/[.]/g);
-		var ext = str.substring(str.indexOf("."), str.length);
+		var split = str.split(/[.]/g);
+		var ext = null//split[split.length - 1];
+		if (split.length > 0) 
+			ext = split[split.length - 1];
+		//var ext = str.substring(str.indexOf("."), str.length);
 		
 		//switch (s[s.length - 1]) {
 		//{type: , encoding: "utf8" };
 		switch(ext) {
-			case ".wav": {
+			case "wav": {
 				return "audio/wav";
 			}
-			case ".ogg": {
+			case "ogg": {
 				return "audio/ogg";
 			}
-			case ".mp3": {
+			case "mp3": {
 				return "audio/mp3";
 			}
-			case ".ico": {
+			case "ico": {
 				return "image/x-icon";
 			}
-			case ".gif": {
+			case "gif": {
 				return "image/gif";
 			}
-			case ".png": {
+			case "png": {
 				return "image/png";
 			}
-			case ".jpg":
-			case ".jpeg": {
+			case "jpg":
+			case "jpeg": {
 				return "image/jpeg";
 			}
-			case ".js": {
+			case "js": {
 				return "text/javascript";
 			}
-			case ".json": {
+			case "json": {
 				return "application/json";
 			}
-			case ".css": {
+			case "css": {
 				return "text/css";
 			}
-			case ".wasm": {
+			case "wasm": {
 				return "application/wasm";
 			}
-			case ".html":
-			case ".htm": {
+			case "html":
+			case "htm": {
 				return "text/html; charset=UTF-8";
 			}
-			case ".zip" :{
+			case "zip" :{
 				return "application/zip";
 			}
-			case ".tar.gz": {
+			//case "tar.gz": {
+			case "tar":
+			case "gz": {
 				return "applicationh/gzip";
 				//return "application/x-tar";
 			}
-			case ".bin": {
+			case "bin": {
 				return "application/octet-stream";
 			}
 			default: {
@@ -302,7 +307,7 @@
 				if (err !== null) {
 					return onDone(null, -1);
 				}
-				var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: 65536 });
+				var stream = FS.createReadStream("", {fd: fd, encoding: null, highWaterMark: rate });
 				stream.on("error", function(error) {
 					return onDone(null, -1);
 				});
