@@ -236,6 +236,83 @@
 			});
 		});
 	};
+	function ProcessDocument(httpResponse, chunks) {
+		//console.log(httpRequest);
+		//httpResponse.env.set("GENERATED_TIME", new Date().getTime() - httpResponse.requestStartTime);
+		var buffer = Buffer.from(chunks);
+		var start = 0;
+		var end = 0;
+		var chunkParse = [];
+		for(var i = 0; i < chunks.length; i++) {
+			if ((chunkParse.length == 0 && chunks[i] == 60)	// <
+			|| (chunkParse.length == 1 && chunks[i] == 33)	// !
+			|| (chunkParse.length == 2 && chunks[i] == 45)	// -
+			|| (chunkParse.length == 3 && chunks[i] == 45)	// -
+			|| (chunkParse.length == 4 && chunks[i] == 35)){// #
+				chunkParse.push(String.fromCharCode(chunks[i]));
+				if (chunkParse.length == 1) {
+					start = i;
+				};
+			}
+			else if (chunkParse.length >= 5) {
+				chunkParse.push(String.fromCharCode(chunks[i]));
+				if (chunkParse.length >= 9) { // min length of a valid statement
+					var identity = [chunkParse[5], chunkParse[6], chunkParse[7], chunkParse[8]].join("");
+					if (identity !== "echo" && identity !== "blip") {
+						chunkParse = [];
+						start = 0;
+						end = 0;
+						continue;
+					};
+				}
+				if (chunkParse[chunkParse.length - 4]	 == " "	// space
+					&& chunkParse[chunkParse.length - 3] == "-"	// -
+					&& chunkParse[chunkParse.length - 2] == "-"	// -
+					&& chunks[i] == 62) {						// >
+					end = i+1;
+					var foundString = chunkParse.join("");
+					var type = foundString.substring(foundString.indexOf("#")+1, foundString.indexOf(" "));
+					var params = { name: null, value: null };
+					
+					if (type == "echo") {
+						var paramSet = foundString.substring(foundString.indexOf(" ")+1, foundString.indexOf(" -->"));
+						var paramSplit = paramSet.split("=");
+						if (paramSplit.length == 2) {
+							params.name = paramSplit[0];
+							try {
+								params.value = JSON.parse(paramSplit[1]);
+							}
+							catch(e) {
+								params.value = paramSet;
+							};
+						}
+						if (params.name == "var") { // environment variable
+							if (params.value != null) {
+								var item = httpResponse.env.get(params.value);
+								if (item != undefined) {
+									buffer = Buffer.concat([buffer.subarray(0, start), Buffer.from(new String(item)), buffer.subarray(end, buffer.length)]);
+									return ProcessDocument(httpResponse, buffer);
+								};
+							};
+						}
+						else { // probably just an echo
+							buffer = Buffer.concat([buffer.subarray(0, start), Buffer.from(paramSet), buffer.subarray(end, buffer.length)]);
+							return ProcessDocument(httpResponse, buffer);
+						};
+					};
+					chunkParse = [];
+					start = 0;
+					end = 0;
+				};
+			}
+			else { // the delimiter set is invalid
+				chunkParse = [];
+				start = 0;
+				end = 0;
+			}
+		};
+		return buffer;
+	};
 	function FindInclude(currentFile, chunk) {
 		var chunkParse = [];
 		var start = 0;
@@ -349,6 +426,7 @@
 						response.end();
 					};
 					function StreamMixer(buffer, rootFile, onDone) {
+						buffer = ProcessDocument(httpResponse, buffer);
 						var found = FindInclude(rootFile, buffer);
 						if (found != null) {
 							((_item, _buffer) => {
@@ -387,36 +465,16 @@
 		
 	};
 	function Head(request, response, httpResponse) {
-		try {
-			/*FS.open(httpResponse.location, 'r', function(err, fd) {
-				if(err !== null)
-					return BadRequest(request, response, 404);
-				FS.fstat(fd, function(err, stats) {
-					try {
-						FS.close(fd, function(err) {
-							if (err !== null) return;
-						});
-						if (err !== null)
-							return BadRequest(request, response, 404);
-						response.writeHead(200, {"Content-Length":stats.size,"Content-Type": GetContentType(httpResponse.location)});
-						response.end();
-					}
-					catch(e) {
-						console.log("fatal error in Get().fstat(): ", e);
-						return HttpCancelSocket(response);
-					};
-				});
-			});*/
-			
+		try {			
 			(() => {
 			
 				function onProcessingComplete(buffer) {
-					//console.log(buffer.toString("utf8", 0));
 					response.writeHead(200, {"Content-Length":buffer.length,"Content-Type": GetContentType(httpResponse.location)});
 					//response.write(buffer);
 					response.end();
 				};
 				function StreamMixer(buffer, rootFile, onDone) {
+					buffer = ProcessDocument(httpResponse, buffer);
 					var found = FindInclude(rootFile, buffer);
 					if (found != null) {
 						((_item, _buffer) => {
@@ -488,7 +546,9 @@
 			var httpResponse = {
 				url: URL.parse(request.url, true),
 				location: null,
-				contentType: GetContentType(".html")
+				contentType: GetContentType(".html"),
+				requestStartTime: new Date().getTime(),
+				env: new Map()
 			};
 			if (httpResponse.url.pathname[httpResponse.url.pathname.length - 1] == "/") { // if end of pathname is / then append index.html
 				httpResponse.url.pathname = PATH.join(httpResponse.url.pathname, "/index.html");
@@ -498,15 +558,15 @@
 				console.log("Request rejected for resource: %s", httpResponse.location);
 				return BadRequest(request, response, 403, "Directory Traversal attempt has been logged.");
 			};
-			/*for(var str in httpResponse.url.query) // fix null prototype that URL.parse returns
-				httpResponse.queryStrings[str] = httpResponse.url.query[str];
-				//httpResponse.queryStrings.set(str, httpResponse.url.query[str]);
-			for(var str in httpResponse.queryStrings)
-				console.log(httpResponse.queryStrings[str]);*/
-			if (!noHeaderSpam)
-			console.log("%s HTTP/%s request from %s\nrequested pathname: %s\nserving resolved path: %s\n%o", 
+			if (!noHeaderSpam) {
+				console.log("%s HTTP/%s request from %s\nrequested pathname: %s\nserving resolved path: %s\n%o", 
 						request.method, request.httpVersion, fromString, httpResponse.url.pathname, httpResponse.location, request.headers);
+			};
 			httpResponse.contentType = GetContentType(httpResponse.location);
+			httpResponse.env.set("REMOTE_IP", remoteAddress || fromAddress);
+			httpResponse.env.set("GENERATED_TIME", 0);
+			httpResponse.env.set("DATE", new Date(httpResponse.requestStartTime));
+			
 			switch(request.method.toUpperCase()) {
 				case 'POST': {
 					return Post(request, response, httpResponse);
