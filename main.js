@@ -258,7 +258,7 @@
 				chunkParse.push(String.fromCharCode(chunks[i]));
 				if (chunkParse.length >= 9) { // min length of a valid statement
 					var identity = [chunkParse[5], chunkParse[6], chunkParse[7], chunkParse[8]].join("");
-					if (identity !== "echo" && identity !== "blip") {
+					if (identity !== "echo") {// && identity !== "blip") {
 						chunkParse = [];
 						start = 0;
 						end = 0;
@@ -288,6 +288,7 @@
 						}
 						if (params.name == "var") { // environment variable
 							if (params.value != null) {
+								httpResponse.env.set("GENERATED_TIME", new Date().getTime() - httpResponse.requestStartTime);
 								var item = httpResponse.env.get(params.value);
 								if (item != undefined) {
 									buffer = Buffer.concat([buffer.subarray(0, start), Buffer.from(new String(item)), buffer.subarray(end, buffer.length)]);
@@ -299,7 +300,11 @@
 							buffer = Buffer.concat([buffer.subarray(0, start), Buffer.from(paramSet), buffer.subarray(end, buffer.length)]);
 							return ProcessDocument(httpResponse, buffer);
 						};
-					};
+					}
+					/*else if (type == "blip") {
+						buffer = Buffer.concat([buffer.subarray(0, start), Buffer.from("BLAP"), buffer.subarray(end, buffer.length)]);
+						return ProcessDocument(httpResponse, buffer);
+					};*/
 					chunkParse = [];
 					start = 0;
 					end = 0;
